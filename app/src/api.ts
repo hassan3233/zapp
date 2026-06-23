@@ -1,0 +1,89 @@
+import { API_URL } from "./config";
+import type { Call, Conversation, Gender, Message, User } from "./types";
+
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
+async function request<T>(
+  path: string,
+  options: { method?: string; body?: unknown } = {}
+): Promise<T> {
+  const res = await fetch(API_URL + path, {
+    method: options.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error((data as any)?.error || `Request failed (${res.status})`);
+  }
+  return data as T;
+}
+
+export const api = {
+  // Phone/OTP auth
+  requestOtp: (phone: string, channel: "sms" | "call" = "sms") =>
+    request<{ sent: boolean; phone: string; channel: string; devCode?: string }>(
+      "/api/auth/request-otp",
+      { method: "POST", body: { phone, channel } }
+    ),
+
+  verifyOtp: (phone: string, code: string) =>
+    request<{ token: string; user: User; profileComplete: boolean }>(
+      "/api/auth/verify-otp",
+      { method: "POST", body: { phone, code } }
+    ),
+
+  updateProfile: (body: {
+    firstName: string;
+    lastName?: string | null;
+    email?: string | null;
+    dateOfBirth?: string | null;
+    gender?: Gender | null;
+    avatar?: string | null;
+  }) =>
+    request<{ user: User }>("/api/auth/profile", { method: "PATCH", body }),
+
+  me: () => request<{ user: User }>("/api/auth/me"),
+
+  setPublicKey: (publicKey: string) =>
+    request<{ user: User }>("/api/auth/public-key", {
+      method: "POST",
+      body: { publicKey },
+    }),
+
+  conversationMembers: (conversationId: number) =>
+    request<{ members: User[] }>(`/api/conversations/${conversationId}/members`),
+
+  searchUsers: (q: string) =>
+    request<{ users: User[] }>(`/api/users?q=${encodeURIComponent(q)}`),
+
+  listConversations: () =>
+    request<{ conversations: Conversation[] }>("/api/conversations"),
+
+  openConversation: (userId: number) =>
+    request<{ conversation: { id: number; members: User[] } }>(
+      "/api/conversations",
+      { method: "POST", body: { userId } }
+    ),
+
+  createGroup: (title: string, memberIds: number[]) =>
+    request<{ conversation: { id: number; title: string; members: User[] } }>(
+      "/api/conversations/group",
+      { method: "POST", body: { title, memberIds } }
+    ),
+
+  listCalls: () => request<{ calls: Call[] }>("/api/calls"),
+
+  listMessages: (conversationId: number, before?: number) =>
+    request<{ messages: Message[] }>(
+      `/api/conversations/${conversationId}/messages` +
+        (before ? `?before=${before}` : "")
+    ),
+};

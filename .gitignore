@@ -1,0 +1,12 @@
+﻿node_modules/
+.expo/
+dist/
+*.log
+*.db
+*.db-shm
+*.db-wal
+.env
+android/build/
+android/app/build/
+android/.gradle/
+.gradle/

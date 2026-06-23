@@ -1,0 +1,42 @@
+// "Welcome" in many languages — cycled on the WelcomeScreen at first launch.
+// `rtl: true` makes the word render right-to-left.
+// NOTE: Hebrew is intentionally excluded.
+export type Greeting = { text: string; name: string; rtl?: boolean };
+
+export const WELCOME_GREETINGS: Greeting[] = [
+  { text: "Welcome", name: "English" },
+  { text: "مرحباً", name: "العربية", rtl: true },
+  { text: "Bienvenido", name: "Español" },
+  { text: "Bienvenue", name: "Français" },
+  { text: "Willkommen", name: "Deutsch" },
+  { text: "Bem-vindo", name: "Português" },
+  { text: "Benvenuto", name: "Italiano" },
+  { text: "Добро пожаловать", name: "Русский" },
+  { text: "خوش آمدید", name: "فارسی", rtl: true },
+  { text: "خوش آمدید", name: "اردو", rtl: true },
+  { text: "स्वागत है", name: "हिन्दी" },
+  { text: "欢迎", name: "简体中文" },
+  { text: "歡迎", name: "繁體中文" },
+  { text: "ようこそ", name: "日本語" },
+  { text: "환영합니다", name: "한국어" },
+  { text: "ยินดีต้อนรับ", name: "ไทย" },
+  { text: "Chào mừng", name: "Tiếng Việt" },
+  { text: "Selamat datang", name: "Bahasa Indonesia" },
+  { text: "Hoş geldiniz", name: "Türkçe" },
+  { text: "Welkom", name: "Nederlands" },
+  { text: "Witamy", name: "Polski" },
+  { text: "Ласкаво просимо", name: "Українська" },
+  { text: "Καλώς ήρθατε", name: "Ελληνικά" },
+  { text: "Bun venit", name: "Română" },
+  { text: "Välkommen", name: "Svenska" },
+  { text: "স্বাগতম", name: "বাংলা" },
+  { text: "வரவேற்கிறோம்", name: "தமிழ்" },
+  { text: "స్వాగతం", name: "తెలుగు" },
+  { text: "Maligayang pagdating", name: "Filipino" },
+  { text: "Karibu", name: "Kiswahili" },
+  { text: "Vítejte", name: "Čeština" },
+  { text: "Velkommen", name: "Dansk" },
+  { text: "Tervetuloa", name: "Suomi" },
+  { text: "Üdvözöljük", name: "Magyar" },
+  { text: "ਜੀ ਆਇਆਂ ਨੂੰ", name: "ਪੰਜਾਬੀ" },
+];
