@@ -87,7 +87,7 @@ export default function PhoneScreen({ navigation }: any) {
 
           <TextInput
             style={styles.input}
-            placeholder="771 234 567"
+            placeholder=""
             placeholderTextColor={colors.textMuted}
             keyboardType="phone-pad"
             value={phone}
