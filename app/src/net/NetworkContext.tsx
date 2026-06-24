@@ -39,7 +39,12 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const online = deviceOnline && socketOnline;
+  // When NetInfo is in the build (real device), trust it for connectivity —
+  // the socket may be intentionally down (e.g. after logout) without meaning
+  // the device is offline. Only fall back to the socket signal when NetInfo
+  // isn't available (dev client).
+  const hasNetInfo = !!(NativeModules as any).RNCNetInfo;
+  const online = hasNetInfo ? deviceOnline : socketOnline;
   return <NetCtx.Provider value={online}>{children}</NetCtx.Provider>;
 }
 
