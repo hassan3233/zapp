@@ -47,18 +47,21 @@ export default function PhoneScreen({ navigation }: any) {
   function chooseCountry(c: Country) {
     userPicked.current = true;
     setCountry(c);
-    // Trim any typed digits to the new country's allowed length.
-    setPhone((p) => p.replace(/\D/g, "").slice(0, c.len));
+    // Trim any typed digits to the new country's allowed length (+1 for a leading 0).
+    setPhone((p) => p.replace(/\D/g, "").slice(0, c.len + 1));
   }
 
+  // Allow typing the national number (with an optional leading 0); strip the
+  // trunk "0" to get the significant number that goes after the country code.
   const localDigits = phone.replace(/[^0-9]/g, "");
-  const validLength = localDigits.length === country.len;
+  const significant = localDigits.replace(/^0+/, "");
+  const validLength = significant.length === country.len;
 
   async function onSubmit() {
     setError(null);
     setBusy(true);
     try {
-      const fullPhone = `${country.dial}${localDigits}`;
+      const fullPhone = `${country.dial}${significant}`;
       const devCode = await requestOtp(fullPhone);
       navigation.navigate("Otp", { phone: fullPhone, devCode });
     } catch (e: any) {
@@ -94,8 +97,8 @@ export default function PhoneScreen({ navigation }: any) {
             placeholderTextColor={colors.textMuted}
             keyboardType="phone-pad"
             value={phone}
-            onChangeText={(v) => setPhone(v.replace(/\D/g, "").slice(0, country.len))}
-            maxLength={country.len}
+            onChangeText={(v) => setPhone(v.replace(/\D/g, "").slice(0, country.len + 1))}
+            maxLength={country.len + 1}
             autoFocus
           />
         </View>
