@@ -17,6 +17,7 @@ import {
   setPublicKey,
   publicUser,
 } from "../store.js";
+import { verifyFirebaseIdToken } from "../firebase.js";
 
 const router = Router();
 
@@ -35,6 +36,27 @@ router.post("/request-otp", async (req, res) => {
   saveOtp(phone, code, expiresAt);
   const { devCode } = await sendOtp(phone, code, channel);
   res.json({ sent: true, phone, channel, devCode }); // devCode is undefined once an SMS gateway is set
+});
+
+// Firebase phone auth: the app signs in with Firebase (which sends the SMS),
+// then posts the resulting ID token here. We verify it and issue our own JWT.
+router.post("/firebase", async (req, res) => {
+  const idToken = (req.body?.idToken || "").toString();
+  if (!idToken) return res.status(400).json({ error: "idToken is required" });
+  try {
+    const decoded = await verifyFirebaseIdToken(idToken);
+    const phone = normalizePhone(decoded.phone_number || "");
+    if (phone.replace("+", "").length < 6) {
+      return res.status(400).json({ error: "token has no phone number" });
+    }
+    const user = findOrCreateByPhone(phone);
+    const token = signToken(user);
+    const pub = publicUser(user);
+    res.json({ token, user: pub, profileComplete: pub.profileComplete });
+  } catch (e) {
+    console.error("[firebase] verify failed:", e?.message);
+    res.status(401).json({ error: "invalid Firebase token" });
+  }
 });
 
 // Step 2: user enters the SMS code -> verify, create/find account, issue token.

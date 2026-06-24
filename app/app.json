@@ -36,7 +36,9 @@
         {
           "contactsPermission": "Zapp Chat uses your contacts to help you find friends who are already on the app."
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
     ]
   }
 }
