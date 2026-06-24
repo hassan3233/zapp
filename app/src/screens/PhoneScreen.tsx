@@ -47,9 +47,12 @@ export default function PhoneScreen({ navigation }: any) {
   function chooseCountry(c: Country) {
     userPicked.current = true;
     setCountry(c);
+    // Trim any typed digits to the new country's allowed length.
+    setPhone((p) => p.replace(/\D/g, "").slice(0, c.len));
   }
 
   const localDigits = phone.replace(/[^0-9]/g, "");
+  const validLength = localDigits.length === country.len;
 
   async function onSubmit() {
     setError(null);
@@ -91,7 +94,8 @@ export default function PhoneScreen({ navigation }: any) {
             placeholderTextColor={colors.textMuted}
             keyboardType="phone-pad"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(v) => setPhone(v.replace(/\D/g, "").slice(0, country.len))}
+            maxLength={country.len}
             autoFocus
           />
         </View>
@@ -102,7 +106,7 @@ export default function PhoneScreen({ navigation }: any) {
         <TouchableOpacity
           style={[styles.button, busy && styles.buttonDisabled]}
           onPress={onSubmit}
-          disabled={busy || localDigits.length < 4}
+          disabled={busy || !validLength}
         >
           {busy ? (
             <ActivityIndicator color="#fff" />
