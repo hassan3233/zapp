@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Logo from "../components/Logo";
 import { useT } from "../i18n/i18n";
 import { WELCOME_GREETINGS } from "../i18n/greetings";
@@ -9,6 +10,7 @@ import { useTheme, type ThemeColors } from "../theme";
 export default function WelcomeScreen({ navigation }: any) {
   const { t } = useT();
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [idx, setIdx] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -49,7 +51,7 @@ export default function WelcomeScreen({ navigation }: any) {
   const g = WELCOME_GREETINGS[idx];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom + 24, 72) }]}>
       <View style={styles.top}>
         <Logo size={120} wordmarkSize={30} />
         <Text style={styles.tagline}>{t("welcome.tagline")}</Text>
