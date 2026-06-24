@@ -24,7 +24,7 @@ const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_ATTEMPTS = 5;
 
 // Step 1: user enters a phone number -> we generate & "send" a code.
-router.post("/request-otp", (req, res) => {
+router.post("/request-otp", async (req, res) => {
   const phone = normalizePhone(req.body?.phone);
   if (phone.replace("+", "").length < 6) {
     return res.status(400).json({ error: "enter a valid phone number" });
@@ -33,8 +33,8 @@ router.post("/request-otp", (req, res) => {
   const code = generateOtpCode();
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
   saveOtp(phone, code, expiresAt);
-  const { devCode } = sendOtp(phone, code, channel);
-  res.json({ sent: true, phone, channel, devCode }); // devCode is undefined in production
+  const { devCode } = await sendOtp(phone, code, channel);
+  res.json({ sent: true, phone, channel, devCode }); // devCode is undefined once an SMS gateway is set
 });
 
 // Step 2: user enters the SMS code -> verify, create/find account, issue token.

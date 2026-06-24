@@ -23,22 +23,56 @@ export function normalizePhone(raw) {
   return plus + s.replace(/[^0-9]/g, "");
 }
 
-// Deliver the OTP over `channel` ("sms" = text message, "call" = voice call).
-// In production, wire a real provider here (e.g. Twilio). Until then, set
-// ZAPP_RETURN_OTP=1 so the API returns the code and the app shows it on-screen —
-// this keeps login working without an SMS/voice gateway.
-export function sendOtp(phone, code, channel = "sms") {
+// Deliver the OTP over `channel` ("sms" | "call"). If Twilio credentials are
+// configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_FROM), the code is
+// sent for real and NOT returned to the client. Otherwise we fall back to
+// returning the code (ZAPP_RETURN_OTP=1) so login still works without a gateway.
+export async function sendOtp(phone, code, channel = "sms") {
   const isProd = process.env.NODE_ENV === "production";
   const alwaysReturn = process.env.ZAPP_RETURN_OTP === "1";
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM; // a Twilio number or alphanumeric sender
+
+  if (sid && token && from) {
+    try {
+      const params = new URLSearchParams({ To: phone, From: from });
+      if (channel === "call") {
+        params.set(
+          "Twiml",
+          `<Response><Say>Your Zapp Chat code is ${code.split("").join(", ")}</Say></Response>`
+        );
+      } else {
+        params.set("Body", `Your Zapp Chat code is ${code}`);
+      }
+      const endpoint = channel === "call" ? "Calls" : "Messages";
+      const res = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${sid}/${endpoint}.json`,
+        {
+          method: "POST",
+          headers: {
+            Authorization:
+              "Basic " + Buffer.from(`${sid}:${token}`).toString("base64"),
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params,
+        }
+      );
+      if (!res.ok) {
+        console.error("[OTP] Twilio error", res.status, await res.text());
+      } else {
+        console.log(`[OTP] sent via Twilio (${channel}) to ${phone}`);
+      }
+    } catch (e) {
+      console.error("[OTP] Twilio exception:", e?.message);
+    }
+    // Provider configured → never leak the code to the client.
+    return { devCode: alwaysReturn ? code : undefined };
+  }
+
+  // No provider configured → dev fallback (code returned to the app/log).
   const via = channel === "call" ? "CALL" : "SMS";
   console.log(`[${via}] -> ${phone}: your Zapp code is ${code}`);
-  // Example Twilio wiring (uncomment + configure once you have a provider):
-  //   if (channel === "call") {
-  //     await twilio.calls.create({ to: phone, from: FROM,
-  //       twiml: `<Response><Say>Your Zapp code is ${code.split("").join(", ")}</Say></Response>` });
-  //   } else {
-  //     await twilio.messages.create({ to: phone, from: FROM, body: `Zapp code: ${code}` });
-  //   }
   return { devCode: !isProd || alwaysReturn ? code : undefined };
 }
 
