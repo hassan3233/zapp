@@ -40,6 +40,13 @@ export const api = {
       { method: "POST", body: { phone, code } }
     ),
 
+  // Firebase phone auth: exchange a verified Firebase ID token for our session.
+  firebaseLogin: (idToken: string) =>
+    request<{ token: string; user: User; profileComplete: boolean }>(
+      "/api/auth/firebase",
+      { method: "POST", body: { idToken } }
+    ),
+
   updateProfile: (body: {
     firstName: string;
     lastName?: string | null;

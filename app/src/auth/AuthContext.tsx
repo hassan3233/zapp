@@ -41,6 +41,7 @@ type AuthState = {
   loading: boolean;
   requestOtp: (phone: string, channel?: "sms" | "call") => Promise<string | undefined>; // returns dev code
   verifyOtp: (phone: string, code: string) => Promise<boolean>; // returns profileComplete
+  loginWithFirebaseToken: (idToken: string) => Promise<boolean>; // returns profileComplete
   updateProfile: (input: ProfileInput) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -96,6 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       requestOtp: async (phone, channel) => {
         const res = await api.requestOtp(phone, channel);
         return res.devCode;
+      },
+      loginWithFirebaseToken: async (idToken) => {
+        const res = await api.firebaseLogin(idToken);
+        await persist(res.token, res.user);
+        return res.profileComplete;
       },
       verifyOtp: async (phone, code) => {
         const res = await api.verifyOtp(phone, code);

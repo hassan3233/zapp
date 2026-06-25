@@ -15,6 +15,7 @@ import Logo from "../components/Logo";
 import CountryPicker from "../components/CountryPicker";
 import { defaultCountry, flagEmoji, type Country } from "../data/countries";
 import { detectCountry } from "../utils/locationCountry";
+import { firebaseAvailable, startPhoneSignIn } from "../auth/phoneAuth";
 import { useTheme, type ThemeColors } from "../theme";
 
 export default function PhoneScreen({ navigation }: any) {
@@ -62,8 +63,14 @@ export default function PhoneScreen({ navigation }: any) {
     setBusy(true);
     try {
       const fullPhone = `${country.dial}${significant}`;
-      const devCode = await requestOtp(fullPhone);
-      navigation.navigate("Otp", { phone: fullPhone, devCode });
+      if (firebaseAvailable()) {
+        // Firebase sends the SMS itself; verify on the next screen.
+        await startPhoneSignIn(fullPhone);
+        navigation.navigate("Otp", { phone: fullPhone, firebase: true });
+      } else {
+        const devCode = await requestOtp(fullPhone);
+        navigation.navigate("Otp", { phone: fullPhone, devCode });
+      }
     } catch (e: any) {
       setError(e.message || "Could not send code");
     } finally {

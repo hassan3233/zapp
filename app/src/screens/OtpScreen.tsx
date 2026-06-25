@@ -10,14 +10,15 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useAuth } from "../auth/AuthContext";
+import { confirmCode, startPhoneSignIn } from "../auth/phoneAuth";
 import { useT } from "../i18n/i18n";
 import { useTheme, type ThemeColors } from "../theme";
 
 const RESEND_SECONDS = 60;
 
 export default function OtpScreen({ route, navigation }: any) {
-  const { phone, devCode } = route.params || {};
-  const { verifyOtp, requestOtp } = useAuth();
+  const { phone, devCode, firebase } = route.params || {};
+  const { verifyOtp, requestOtp, loginWithFirebaseToken } = useAuth();
   const { t } = useT();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -59,7 +60,12 @@ export default function OtpScreen({ route, navigation }: any) {
     setBusy(true);
     try {
       // Returns profileComplete; RootNavigator switches stacks based on auth state.
-      await verifyOtp(phone, code.trim());
+      if (firebase) {
+        const idToken = await confirmCode(code.trim());
+        await loginWithFirebaseToken(idToken);
+      } else {
+        await verifyOtp(phone, code.trim());
+      }
     } catch (e: any) {
       setError(e.message || "Verification failed");
     } finally {
@@ -72,9 +78,15 @@ export default function OtpScreen({ route, navigation }: any) {
     setInfo(null);
     setSending(true);
     try {
-      const dc = await requestOtp(phone, channel);
-      setHintCode(dc);
-      setInfo(channel === "call" ? t("otp.callMsg") : t("otp.smsMsg"));
+      if (firebase) {
+        // Firebase only does SMS; re-send the code.
+        await startPhoneSignIn(phone);
+        setInfo(t("otp.smsMsg"));
+      } else {
+        const dc = await requestOtp(phone, channel);
+        setHintCode(dc);
+        setInfo(channel === "call" ? t("otp.callMsg") : t("otp.smsMsg"));
+      }
       restartCountdown();
     } catch (e: any) {
       setError(e.message || "Could not resend");
@@ -143,14 +155,16 @@ export default function OtpScreen({ route, navigation }: any) {
               <Text style={styles.optionIcon}>💬</Text>
               <Text style={styles.optionText}>{t("otp.resendSms")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.option, !canResend && styles.optionDisabled]}
-              onPress={() => send("call")}
-              disabled={!canResend}
-            >
-              <Text style={styles.optionIcon}>📞</Text>
-              <Text style={styles.optionText}>{t("otp.callMe")}</Text>
-            </TouchableOpacity>
+            {!firebase ? (
+              <TouchableOpacity
+                style={[styles.option, !canResend && styles.optionDisabled]}
+                onPress={() => send("call")}
+                disabled={!canResend}
+              >
+                <Text style={styles.optionIcon}>📞</Text>
+                <Text style={styles.optionText}>{t("otp.callMe")}</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         )}
 
