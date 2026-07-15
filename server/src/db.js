@@ -63,6 +63,15 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_calls_users ON calls(caller_id, callee_id, id);
 
+  -- FCM device tokens for push notifications (a user may have several devices).
+  CREATE TABLE IF NOT EXISTS push_tokens (
+    token      TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    platform   TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id);
+
   CREATE INDEX IF NOT EXISTS idx_messages_conversation
     ON messages(conversation_id, id);
   CREATE INDEX IF NOT EXISTS idx_members_user

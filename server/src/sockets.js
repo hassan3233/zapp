@@ -7,11 +7,45 @@ import {
   finishCall,
   getUserById,
   publicUser,
+  getConversation,
+  getConversationMemberIds,
+  getPushTokensForUsers,
+  deletePushToken,
 } from "./store.js";
+import { sendPush } from "./firebase.js";
 
 // Presence: how many live sockets each user has, and when they were last seen.
 const onlineCounts = new Map(); // userId -> socket count
 const lastSeenMap = new Map(); // userId -> ISO timestamp
+
+// Push a "new message" notification to members who have no live socket (app
+// closed / backgrounded / phone locked). Content stays generic — messages are
+// end-to-end encrypted, so the server only ever sees ciphertext.
+function notifyOfflineMembers(convId, senderId) {
+  try {
+    const recipients = getConversationMemberIds(convId).filter(
+      (id) => id !== senderId && !onlineCounts.get(id)
+    );
+    if (!recipients.length) return;
+    const rows = getPushTokensForUsers(recipients);
+    if (!rows.length) return;
+
+    const conv = getConversation(convId);
+    const senderName = publicUser(getUserById(senderId))?.displayName || "Someone";
+    const isGroup = !!conv?.is_group;
+    const title = isGroup ? conv.title || "New message" : senderName;
+    const body = isGroup ? `${senderName}: New message` : "New message";
+
+    sendPush(
+      rows.map((r) => r.token),
+      { title, body, data: { type: "message", conversationId: String(convId), title } }
+    )
+      .then(({ invalidTokens }) => invalidTokens.forEach(deletePushToken))
+      .catch((e) => console.error("[push] send failed:", e?.message));
+  } catch (e) {
+    console.error("[push] notify failed:", e?.message);
+  }
+}
 
 export function registerSockets(io) {
   // Authenticate every socket connection using the JWT from the handshake.
@@ -90,6 +124,8 @@ export function registerSockets(io) {
         body: text,
       });
       io.to(`conversation:${convId}`).emit("message:new", message);
+      // Push to any member who isn't currently connected (locked / app closed).
+      notifyOfflineMembers(convId, socket.user.id);
       if (typeof ack === "function") ack({ ok: true, message });
     });
 

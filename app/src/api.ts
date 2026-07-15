@@ -71,6 +71,18 @@ export const api = {
   searchUsers: (q: string) =>
     request<{ users: User[] }>(`/api/users?q=${encodeURIComponent(q)}`),
 
+  // Push-notification device token registration.
+  registerPushToken: (token: string, platform?: string) =>
+    request<{ ok: boolean }>("/api/users/push-token", {
+      method: "POST",
+      body: { token, platform },
+    }),
+  unregisterPushToken: (token: string) =>
+    request<{ ok: boolean }>("/api/users/push-token", {
+      method: "DELETE",
+      body: { token },
+    }),
+
   listConversations: () =>
     request<{ conversations: Conversation[] }>("/api/conversations"),
 

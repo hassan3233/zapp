@@ -111,7 +111,43 @@ export function setPublicKey(id, publicKey) {
   return getUserById(id);
 }
 
+// ---- Push tokens ----
+export function savePushToken(userId, token, platform) {
+  db.prepare(
+    `INSERT INTO push_tokens (token, user_id, platform, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(token) DO UPDATE SET
+       user_id = excluded.user_id,
+       platform = excluded.platform,
+       updated_at = datetime('now')`
+  ).run(token, userId, platform ?? null);
+}
+
+export function deletePushToken(token) {
+  db.prepare("DELETE FROM push_tokens WHERE token = ?").run(token);
+}
+
+// All device tokens for a set of users (used to fan out a notification).
+export function getPushTokensForUsers(userIds) {
+  if (!userIds.length) return [];
+  const placeholders = userIds.map(() => "?").join(",");
+  return db
+    .prepare(`SELECT token, user_id FROM push_tokens WHERE user_id IN (${placeholders})`)
+    .all(...userIds);
+}
+
 // ---- Conversations ----
+export function getConversation(conversationId) {
+  return db.prepare("SELECT * FROM conversations WHERE id = ?").get(conversationId);
+}
+
+export function getConversationMemberIds(conversationId) {
+  return db
+    .prepare("SELECT user_id FROM conversation_members WHERE conversation_id = ?")
+    .all(conversationId)
+    .map((r) => r.user_id);
+}
+
 export function isMember(conversationId, userId) {
   return !!db
     .prepare(

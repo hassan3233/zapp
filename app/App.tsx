@@ -1,13 +1,18 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { ActivityIndicator, View, Text } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   NavigationContainer,
+  createNavigationContainerRef,
   DarkTheme,
   DefaultTheme,
   Theme,
 } from "@react-navigation/native";
+import {
+  setupBackgroundMessageHandler,
+  initPushHandlers,
+} from "./src/push";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
@@ -35,6 +40,30 @@ import StorageDataScreen from "./src/screens/StorageDataScreen";
 import LanguageScreen from "./src/screens/LanguageScreen";
 import ThemeScreen from "./src/screens/ThemeScreen";
 import { ThemeProvider, useTheme, useThemePref } from "./src/theme";
+
+// Register the FCM background handler before the app renders (required so
+// notifications are handled when the app is killed/backgrounded).
+setupBackgroundMessageHandler();
+
+// Ref + helper so a notification tap can navigate into the right chat, even if
+// the app was cold-started (queued until navigation is ready).
+const navigationRef = createNavigationContainerRef();
+let pendingChat: { conversationId: number; title?: string } | null = null;
+
+function openChatFromNotification(conversationId: number, title?: string) {
+  if (navigationRef.isReady()) {
+    try {
+      (navigationRef.navigate as any)("ChatsTab", {
+        screen: "Chat",
+        params: { conversationId, title },
+      });
+    } catch {
+      /* not authenticated / route missing — app still opens */
+    }
+  } else {
+    pendingChat = { conversationId, title };
+  }
+}
 
 // Header/content styling that follows the active theme.
 function useScreenOptions() {
@@ -165,6 +194,10 @@ function RootNavigator() {
 function Root() {
   const colors = useTheme();
   const { scheme } = useThemePref();
+
+  // Route notification taps (token refresh too) into the app.
+  useEffect(() => initPushHandlers(openChatFromNotification), []);
+
   const base = scheme === "light" ? DefaultTheme : DarkTheme;
   const navTheme: Theme = {
     ...base,
@@ -181,7 +214,17 @@ function Root() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <OfflineBanner />
       <View style={{ flex: 1 }}>
-        <NavigationContainer theme={navTheme}>
+        <NavigationContainer
+          ref={navigationRef}
+          theme={navTheme}
+          onReady={() => {
+            if (pendingChat) {
+              const p = pendingChat;
+              pendingChat = null;
+              openChatFromNotification(p.conversationId, p.title);
+            }
+          }}
+        >
           <RootNavigator />
         </NavigationContainer>
       </View>

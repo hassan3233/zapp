@@ -9,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api, setAuthToken } from "../api";
 import { connectSocket, disconnectSocket } from "../socket";
 import { ensureKeys } from "../crypto/e2ee";
+import { registerForPush, unregisterForPush } from "../push";
 import type { Gender, User } from "../types";
 
 // Make sure this device has an E2EE keypair and the server has our public key.
@@ -68,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(parsed);
           connectSocket(savedToken);
           ensureE2EE(parsed);
+          registerForPush();
         }
       } catch {
         // ignore restore errors
@@ -87,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       [USER_KEY, JSON.stringify(nextUser)],
     ]);
     ensureE2EE(nextUser);
+    registerForPush();
   }
 
   const value = useMemo<AuthState>(
@@ -114,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(res.user));
       },
       logout: async () => {
+        await unregisterForPush();
         disconnectSocket();
         setAuthToken(null);
         setToken(null);
