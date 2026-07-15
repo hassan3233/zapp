@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { api } from "../api";
 import { getSocket } from "../socket";
 import { useAuth } from "../auth/AuthContext";
@@ -34,6 +35,10 @@ export default function ChatScreen({ route, navigation }: any) {
   const { isOnline, lastSeen } = usePresence();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  // Header + status-bar height — the exact offset KeyboardAvoidingView needs so
+  // the composer sits right on top of the keyboard (edge-to-edge defeats the
+  // manifest's adjustResize on RN 0.85, so we lift it in JS).
+  const headerHeight = useHeaderHeight();
 
   // Presence subtitle for 1:1 chats.
   const peerOnline = peer ? isOnline(peer.id) : false;
@@ -189,8 +194,8 @@ export default function ChatScreen({ route, navigation }: any) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={headerHeight}
     >
       {encActive ? (
         <View style={styles.e2eeBanner}>
