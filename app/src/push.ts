@@ -7,8 +7,10 @@ function messagingAvailable(): boolean {
   return !!(NativeModules as any).RNFBMessagingModule;
 }
 
+// Returns the messaging INSTANCE (the default export is a factory that must be
+// called). All the methods below live on the instance.
 function messaging(): any {
-  return require("@react-native-firebase/messaging").default;
+  return require("@react-native-firebase/messaging").default();
 }
 
 let currentToken: string | null = null;
@@ -67,7 +69,7 @@ export function initPushHandlers(
   if (!messagingAvailable()) return () => {};
   const m = messaging();
 
-  const unsubRefresh = m().onTokenRefresh(async (token: string) => {
+  const unsubRefresh = m.onTokenRefresh(async (token: string) => {
     currentToken = token;
     try {
       await api.registerPushToken(token, Platform.OS);
@@ -81,10 +83,9 @@ export function initPushHandlers(
     if (convId) onOpenConversation(convId, msg?.data?.title);
   };
 
-  const unsubOpened = m().onNotificationOpenedApp(handleOpen);
+  const unsubOpened = m.onNotificationOpenedApp(handleOpen);
   // App launched from a fully-closed state by tapping a notification.
-  m()
-    .getInitialNotification()
+  m.getInitialNotification()
     .then((msg: any) => {
       if (msg) handleOpen(msg);
     })
