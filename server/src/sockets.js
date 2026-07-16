@@ -19,6 +19,11 @@ import { sendPush } from "./firebase.js";
 const onlineCounts = new Map(); // userId -> socket count
 const lastSeenMap = new Map(); // userId -> ISO timestamp
 
+// How many distinct users are connected right now (for the admin panel).
+export function getOnlineUserCount() {
+  return onlineCounts.size;
+}
+
 // Push a "new message" notification to members who have no live socket (app
 // closed / backgrounded / phone locked). Content stays generic — messages are
 // end-to-end encrypted, so the server only ever sees ciphertext.

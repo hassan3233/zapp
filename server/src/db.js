@@ -103,5 +103,8 @@ if (!userCols.some((c) => c.name === "public_key")) {
 if (!userCols.some((c) => c.name === "bio")) {
   db.exec("ALTER TABLE users ADD COLUMN bio TEXT");
 }
+if (!userCols.some((c) => c.name === "banned")) {
+  db.exec("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0");
+}
 
 export default db;

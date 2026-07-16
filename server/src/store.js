@@ -141,6 +141,87 @@ export function createReport(reporterId, reportedId, reason) {
   ).run(reporterId, reportedId, reason ?? null);
 }
 
+// ---- Admin ----
+export function adminStats() {
+  const count = (sql) => Number(db.prepare(sql).get().n);
+  return {
+    users: count("SELECT COUNT(*) n FROM users"),
+    messages: count("SELECT COUNT(*) n FROM messages"),
+    conversations: count("SELECT COUNT(*) n FROM conversations"),
+    calls: count("SELECT COUNT(*) n FROM calls"),
+    reports: count("SELECT COUNT(*) n FROM reports"),
+    blocks: count("SELECT COUNT(*) n FROM blocks"),
+    banned: count("SELECT COUNT(*) n FROM users WHERE banned = 1"),
+  };
+}
+
+export function adminListUsers(q, limit = 100) {
+  const like = `%${q || ""}%`;
+  return db
+    .prepare(
+      `SELECT u.id, u.phone, u.first_name, u.last_name, u.created_at, u.banned,
+              u.profile_complete,
+              (SELECT COUNT(*) FROM messages m WHERE m.sender_id = u.id) AS message_count,
+              (SELECT COUNT(*) FROM reports r WHERE r.reported_id = u.id) AS report_count
+       FROM users u
+       WHERE u.phone LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?
+       ORDER BY u.id DESC LIMIT ?`
+    )
+    .all(like, like, like, limit)
+    .map((u) => ({
+      id: u.id,
+      phone: u.phone,
+      name: `${u.first_name || ""} ${u.last_name || ""}`.trim() || null,
+      createdAt: u.created_at,
+      banned: !!u.banned,
+      profileComplete: !!u.profile_complete,
+      messages: Number(u.message_count),
+      reports: Number(u.report_count),
+    }));
+}
+
+export function setBanned(userId, banned) {
+  db.prepare("UPDATE users SET banned = ? WHERE id = ?").run(banned ? 1 : 0, userId);
+  return getUserById(userId);
+}
+
+// Deletes the user; FK cascades remove their memberships, messages, calls,
+// push tokens, blocks and reports.
+export function deleteUser(userId) {
+  db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+}
+
+export function adminListReports(limit = 100) {
+  return db
+    .prepare(
+      `SELECT r.id, r.reason, r.created_at,
+              r.reporter_id, ru.first_name AS rep_first, ru.last_name AS rep_last, ru.phone AS rep_phone,
+              r.reported_id, tu.first_name AS tgt_first, tu.last_name AS tgt_last, tu.phone AS tgt_phone
+       FROM reports r
+       LEFT JOIN users ru ON ru.id = r.reporter_id
+       LEFT JOIN users tu ON tu.id = r.reported_id
+       ORDER BY r.id DESC LIMIT ?`
+    )
+    .all(limit)
+    .map((r) => ({
+      id: r.id,
+      reason: r.reason,
+      createdAt: r.created_at,
+      reporter: {
+        id: r.reporter_id,
+        name: `${r.rep_first || ""} ${r.rep_last || ""}`.trim() || r.rep_phone || "(deleted)",
+      },
+      reported: {
+        id: r.reported_id,
+        name: `${r.tgt_first || ""} ${r.tgt_last || ""}`.trim() || r.tgt_phone || "(deleted)",
+      },
+    }));
+}
+
+export function deleteReport(id) {
+  db.prepare("DELETE FROM reports WHERE id = ?").run(id);
+}
+
 // Store a user's E2EE identity public key (base64).
 export function setPublicKey(id, publicKey) {
   db.prepare("UPDATE users SET public_key = ? WHERE id = ?").run(

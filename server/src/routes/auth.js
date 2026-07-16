@@ -50,6 +50,7 @@ router.post("/firebase", async (req, res) => {
       return res.status(400).json({ error: "token has no phone number" });
     }
     const user = findOrCreateByPhone(phone);
+    if (user.banned) return res.status(403).json({ error: "account suspended" });
     const token = signToken(user);
     const pub = publicUser(user);
     res.json({ token, user: pub, profileComplete: pub.profileComplete });
@@ -82,6 +83,7 @@ router.post("/verify-otp", (req, res) => {
 
   clearOtp(phone);
   const user = findOrCreateByPhone(phone);
+  if (user.banned) return res.status(403).json({ error: "account suspended" });
   const token = signToken(user);
   const pub = publicUser(user);
   res.json({ token, user: pub, profileComplete: pub.profileComplete });
