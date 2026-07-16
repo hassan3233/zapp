@@ -35,6 +35,7 @@ export default function EditProfileScreen({ navigation }: any) {
   const [showDate, setShowDate] = useState(false);
   const [gender, setGender] = useState<Gender | null>(user?.gender || null);
   const [avatar, setAvatar] = useState<string | null>(user?.avatar || null);
+  const [bio, setBio] = useState(user?.bio || "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -74,6 +75,7 @@ export default function EditProfileScreen({ navigation }: any) {
         dateOfBirth: dob ? fmtDate(dob) : null,
         gender,
         avatar,
+        bio: bio.trim() || null,
       });
       navigation.goBack();
     } catch (e: any) {
@@ -103,6 +105,17 @@ export default function EditProfileScreen({ navigation }: any) {
       <Text style={styles.label}>Last name</Text>
       <TextInput style={styles.input} value={lastName} onChangeText={setLastName}
         placeholder="Last name" placeholderTextColor={colors.textMuted} />
+
+      <Text style={styles.label}>Bio</Text>
+      <TextInput
+        style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+        value={bio}
+        onChangeText={setBio}
+        placeholder="Tell people a little about yourself"
+        placeholderTextColor={colors.textMuted}
+        multiline
+        maxLength={300}
+      />
 
       <Text style={styles.label}>Email</Text>
       <TextInput style={styles.input} value={email} onChangeText={setEmail}

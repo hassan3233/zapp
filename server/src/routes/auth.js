@@ -89,7 +89,7 @@ router.post("/verify-otp", (req, res) => {
 
 // Step 3+: complete/update the profile (name, dob, gender, avatar, optional email).
 router.patch("/profile", requireAuth, (req, res) => {
-  const { firstName, lastName, email, dateOfBirth, gender, avatar } = req.body || {};
+  const { firstName, lastName, email, dateOfBirth, gender, avatar, bio } = req.body || {};
   if (!firstName || !String(firstName).trim()) {
     return res.status(400).json({ error: "first name is required" });
   }
@@ -103,6 +103,7 @@ router.patch("/profile", requireAuth, (req, res) => {
     dateOfBirth: dateOfBirth || null,
     gender: gender || null,
     avatar: avatar || null,
+    bio: bio ? String(bio).trim().slice(0, 300) : null,
   });
   res.json({ user: publicUser(user) });
 });

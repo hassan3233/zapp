@@ -97,7 +97,11 @@ export default function ChatScreen({ route, navigation }: any) {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: () => (
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <TouchableOpacity
+          style={{ flexDirection: "row", alignItems: "center" }}
+          disabled={!peer}
+          onPress={() => peer && navigation.navigate("ContactProfile", { user: peer })}
+        >
           {peer?.avatar ? (
             <Image
               source={{ uri: peer.avatar }}
@@ -130,7 +134,7 @@ export default function ChatScreen({ route, navigation }: any) {
               </Text>
             ) : null}
           </View>
-        </View>
+        </TouchableOpacity>
       ),
       headerRight: peer
         ? () => (

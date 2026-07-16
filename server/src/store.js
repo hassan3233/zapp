@@ -44,7 +44,7 @@ export function findOrCreateByPhone(phone) {
   return getUserById(Number(info.lastInsertRowid));
 }
 
-export function updateProfile(id, { firstName, lastName, email, dateOfBirth, gender, avatar }) {
+export function updateProfile(id, { firstName, lastName, email, dateOfBirth, gender, avatar, bio }) {
   db.prepare(
     `UPDATE users SET
        first_name = ?,
@@ -53,6 +53,7 @@ export function updateProfile(id, { firstName, lastName, email, dateOfBirth, gen
        date_of_birth = ?,
        gender = ?,
        avatar = ?,
+       bio = ?,
        profile_complete = 1
      WHERE id = ?`
   ).run(
@@ -62,6 +63,7 @@ export function updateProfile(id, { firstName, lastName, email, dateOfBirth, gen
     dateOfBirth ?? null,
     gender ?? null,
     avatar ?? null,
+    bio ?? null,
     id
   );
   return getUserById(id);
@@ -97,9 +99,46 @@ export function publicUser(user) {
     dateOfBirth: user.date_of_birth,
     gender: user.gender,
     avatar: user.avatar,
+    bio: user.bio || null,
     publicKey: user.public_key || null,
     profileComplete: !!user.profile_complete,
   };
+}
+
+// ---- Blocks & reports ----
+export function blockUser(blockerId, blockedId) {
+  db.prepare(
+    "INSERT OR IGNORE INTO blocks (blocker_id, blocked_id) VALUES (?, ?)"
+  ).run(blockerId, blockedId);
+}
+
+export function unblockUser(blockerId, blockedId) {
+  db.prepare("DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?").run(
+    blockerId,
+    blockedId
+  );
+}
+
+export function hasBlocked(blockerId, blockedId) {
+  return !!db
+    .prepare("SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?")
+    .get(blockerId, blockedId);
+}
+
+// True when either user has blocked the other (messages/calls stop both ways).
+export function isBlockedEither(a, b) {
+  return !!db
+    .prepare(
+      `SELECT 1 FROM blocks
+       WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`
+    )
+    .get(a, b, b, a);
+}
+
+export function createReport(reporterId, reportedId, reason) {
+  db.prepare(
+    "INSERT INTO reports (reporter_id, reported_id, reason) VALUES (?, ?, ?)"
+  ).run(reporterId, reportedId, reason ?? null);
 }
 
 // Store a user's E2EE identity public key (base64).

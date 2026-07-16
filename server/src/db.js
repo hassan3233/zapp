@@ -63,6 +63,23 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_calls_users ON calls(caller_id, callee_id, id);
 
+  -- User blocks (blocker no longer receives messages/calls from blocked).
+  CREATE TABLE IF NOT EXISTS blocks (
+    blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (blocker_id, blocked_id)
+  );
+
+  -- Abuse reports (stored for review; no automated action).
+  CREATE TABLE IF NOT EXISTS reports (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason      TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   -- FCM device tokens for push notifications (a user may have several devices).
   CREATE TABLE IF NOT EXISTS push_tokens (
     token      TEXT PRIMARY KEY,
@@ -78,10 +95,13 @@ db.exec(`
     ON conversation_members(user_id);
 `);
 
-// Migration: add users.public_key to databases created before E2EE existed.
+// Migrations: add columns to databases created before these features existed.
 const userCols = db.prepare("PRAGMA table_info(users)").all();
 if (!userCols.some((c) => c.name === "public_key")) {
   db.exec("ALTER TABLE users ADD COLUMN public_key TEXT");
+}
+if (!userCols.some((c) => c.name === "bio")) {
+  db.exec("ALTER TABLE users ADD COLUMN bio TEXT");
 }
 
 export default db;

@@ -32,6 +32,7 @@ import ProfileSetupScreen from "./src/screens/ProfileSetupScreen";
 import ConversationsScreen from "./src/screens/ConversationsScreen";
 import NewChatScreen from "./src/screens/NewChatScreen";
 import ChatScreen from "./src/screens/ChatScreen";
+import ContactProfileScreen from "./src/screens/ContactProfileScreen";
 import CallsScreen from "./src/screens/CallsScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
@@ -110,6 +111,11 @@ function ChatsStack() {
       <ChatsStackNav.Screen name="Conversations" component={ConversationsScreen} options={{ title: t("appName") }} />
       <ChatsStackNav.Screen name="NewChat" component={NewChatScreen} options={{ title: t("title.newChat") }} />
       <ChatsStackNav.Screen name="Chat" component={ChatScreen} />
+      <ChatsStackNav.Screen
+        name="ContactProfile"
+        component={ContactProfileScreen}
+        options={{ title: "" }}
+      />
     </ChatsStackNav.Navigator>
   );
 }
@@ -166,11 +172,12 @@ function AppTabs() {
         options={({ route }) => ({
           title: t("tab.chats"),
           tabBarIcon: tabIcon("💬"),
-          // Hide the bottom tab bar while inside an open chat.
-          tabBarStyle:
-            (getFocusedRouteNameFromRoute(route) ?? "Conversations") === "Chat"
-              ? { display: "none" as const }
-              : { backgroundColor: colors.surface, borderTopColor: colors.border },
+          // Hide the bottom tab bar while inside an open chat (and its profile).
+          tabBarStyle: ["Chat", "ContactProfile"].includes(
+            getFocusedRouteNameFromRoute(route) ?? "Conversations"
+          )
+            ? { display: "none" as const }
+            : { backgroundColor: colors.surface, borderTopColor: colors.border },
         })}
       />
       <Tab.Screen name="CallsTab" component={CallsStack} options={{ title: t("tab.calls"), tabBarIcon: tabIcon("📞") }} />

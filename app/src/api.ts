@@ -54,6 +54,7 @@ export const api = {
     dateOfBirth?: string | null;
     gender?: Gender | null;
     avatar?: string | null;
+    bio?: string | null;
   }) =>
     request<{ user: User }>("/api/auth/profile", { method: "PATCH", body }),
 
@@ -70,6 +71,19 @@ export const api = {
 
   searchUsers: (q: string) =>
     request<{ users: User[] }>(`/api/users?q=${encodeURIComponent(q)}`),
+
+  // Contact profile + block/report.
+  getUser: (id: number) =>
+    request<{ user: User; blockedByMe: boolean }>(`/api/users/${id}`),
+  blockUser: (id: number) =>
+    request<{ ok: boolean; blocked: boolean }>(`/api/users/${id}/block`, { method: "POST" }),
+  unblockUser: (id: number) =>
+    request<{ ok: boolean; blocked: boolean }>(`/api/users/${id}/block`, { method: "DELETE" }),
+  reportUser: (id: number, reason?: string) =>
+    request<{ ok: boolean }>(`/api/users/${id}/report`, {
+      method: "POST",
+      body: { reason },
+    }),
 
   // Push-notification device token registration.
   registerPushToken: (token: string, platform?: string) =>

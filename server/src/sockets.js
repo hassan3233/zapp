@@ -11,6 +11,7 @@ import {
   getConversationMemberIds,
   getPushTokensForUsers,
   deletePushToken,
+  isBlockedEither,
 } from "./store.js";
 import { sendPush } from "./firebase.js";
 
@@ -118,6 +119,17 @@ export function registerSockets(io) {
         if (typeof ack === "function") ack({ ok: false, error: "forbidden" });
         return;
       }
+      // In 1:1 chats a block (either direction) stops messages.
+      const conv = getConversation(convId);
+      if (conv && !conv.is_group) {
+        const other = getConversationMemberIds(convId).find(
+          (id) => id !== socket.user.id
+        );
+        if (other && isBlockedEither(socket.user.id, other)) {
+          if (typeof ack === "function") ack({ ok: false, error: "blocked" });
+          return;
+        }
+      }
       const message = createMessage({
         conversationId: convId,
         senderId: socket.user.id,
@@ -147,6 +159,10 @@ export function registerSockets(io) {
       const callee = getUserById(Number(toUserId));
       if (!callee) {
         if (typeof ack === "function") ack({ ok: false, error: "user not found" });
+        return;
+      }
+      if (isBlockedEither(socket.user.id, callee.id)) {
+        if (typeof ack === "function") ack({ ok: false, error: "blocked" });
         return;
       }
       const call = createCall({

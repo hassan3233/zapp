@@ -10,6 +10,7 @@ export type User = {
   dateOfBirth: string | null;
   gender: Gender | null;
   avatar: string | null;
+  bio?: string | null;
   publicKey?: string | null;
   profileComplete: boolean;
 };
