@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   FlatList,
+  Image,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -82,15 +83,39 @@ export default function ChatScreen({ route, navigation }: any) {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: () => (
-        <View>
-          <Text style={{ color: colors.text, fontSize: 17, fontWeight: "600" }} numberOfLines={1}>
-            {title || "Chat"}
-          </Text>
-          {peer && statusText ? (
-            <Text style={{ color: peerOnline ? "#2ecc71" : colors.textMuted, fontSize: 12 }}>
-              {statusText}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {peer?.avatar ? (
+            <Image
+              source={{ uri: peer.avatar }}
+              style={{ width: 34, height: 34, borderRadius: 17, marginRight: 10 }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                marginRight: 10,
+                backgroundColor: colors.primary,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: colors.onPrimary, fontWeight: "800", fontSize: 15 }}>
+                {(title || "?").charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View>
+            <Text style={{ color: colors.text, fontSize: 17, fontWeight: "600" }} numberOfLines={1}>
+              {title || "Chat"}
             </Text>
-          ) : null}
+            {peer && statusText ? (
+              <Text style={{ color: peerOnline ? "#2ecc71" : colors.textMuted, fontSize: 12 }}>
+                {statusText}
+              </Text>
+            ) : null}
+          </View>
         </View>
       ),
       headerRight: peer

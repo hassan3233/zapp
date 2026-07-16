@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   NavigationContainer,
   createNavigationContainerRef,
+  getFocusedRouteNameFromRoute,
   DarkTheme,
   DefaultTheme,
   Theme,
@@ -159,7 +160,19 @@ function AppTabs() {
         tabBarInactiveTintColor: colors.textMuted,
       }}
     >
-      <Tab.Screen name="ChatsTab" component={ChatsStack} options={{ title: t("tab.chats"), tabBarIcon: tabIcon("💬") }} />
+      <Tab.Screen
+        name="ChatsTab"
+        component={ChatsStack}
+        options={({ route }) => ({
+          title: t("tab.chats"),
+          tabBarIcon: tabIcon("💬"),
+          // Hide the bottom tab bar while inside an open chat.
+          tabBarStyle:
+            (getFocusedRouteNameFromRoute(route) ?? "Conversations") === "Chat"
+              ? { display: "none" as const }
+              : { backgroundColor: colors.surface, borderTopColor: colors.border },
+        })}
+      />
       <Tab.Screen name="CallsTab" component={CallsStack} options={{ title: t("tab.calls"), tabBarIcon: tabIcon("📞") }} />
       <Tab.Screen name="SettingsTab" component={SettingsStack} options={{ title: t("tab.settings"), tabBarIcon: tabIcon("⚙️") }} />
     </Tab.Navigator>
