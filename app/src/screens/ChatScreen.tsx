@@ -5,11 +5,13 @@ import {
   TextInput,
   FlatList,
   Image,
+  Keyboard,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { api } from "../api";
 import { getSocket } from "../socket";
@@ -40,6 +42,18 @@ export default function ChatScreen({ route, navigation }: any) {
   // the composer sits right on top of the keyboard (edge-to-edge defeats the
   // manifest's adjustResize on RN 0.85, so we lift it in JS).
   const headerHeight = useHeaderHeight();
+  // Keep the composer above the system navigation bar when the keyboard is
+  // closed; sit snug on the keyboard when it's open.
+  const insets = useSafeAreaInsets();
+  const [kbVisible, setKbVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKbVisible(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKbVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Presence subtitle for 1:1 chats.
   const peerOnline = peer ? isOnline(peer.id) : false;
@@ -265,7 +279,12 @@ export default function ChatScreen({ route, navigation }: any) {
 
       {peerTyping ? <Text style={styles.typing}>typing…</Text> : null}
 
-      <View style={styles.composer}>
+      <View
+        style={[
+          styles.composer,
+          { paddingBottom: kbVisible ? 8 : Math.max(insets.bottom + 8, 20) },
+        ]}
+      >
         <TextInput
           style={styles.input}
           placeholder={t("chat.message")}
