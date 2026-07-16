@@ -122,12 +122,12 @@ export default function ContactProfileScreen({ route, navigation }: any) {
       <Modal transparent visible={menuOpen} animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={() => setMenuOpen(false)}>
           <View style={styles.menu}>
-            <TouchableOpacity style={styles.menuItem} onPress={doBlockToggle}>
-              <Text style={styles.menuText}>{blocked ? "Unblock" : "Block"}</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
             <TouchableOpacity style={styles.menuItem} onPress={doReport}>
               <Text style={[styles.menuText, { color: colors.danger }]}>Report</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={doBlockToggle}>
+              <Text style={styles.menuText}>{blocked ? "Unblock" : "Block"}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
