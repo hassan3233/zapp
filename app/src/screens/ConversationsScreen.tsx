@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   FlatList,
   TouchableOpacity,
   StyleSheet,
@@ -28,6 +29,20 @@ export default function ConversationsScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [, setKeysReady] = useState(false);
 
+  // ---- Message search (client-side: messages are E2EE, so we decrypt and
+  // match on the device — the server only ever sees ciphertext). ----
+  type SearchResult =
+    | { kind: "conv"; conv: Conversation }
+    | { kind: "msg"; conv: Conversation; id: number; body: string; createdAt: string; mine: boolean };
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  // Decrypted messages per conversation, fetched lazily on first search.
+  const msgCache = useRef<Map<number, { id: number; body: string; createdAt: string; mine: boolean }[]>>(
+    new Map()
+  );
+  const searchSeq = useRef(0);
+
   // Load our keys so encrypted previews can be decrypted (re-render when ready).
   useEffect(() => {
     ensureKeys().then(() => setKeysReady(true)).catch(() => {});
@@ -46,6 +61,8 @@ export default function ConversationsScreen({ navigation }: any) {
     try {
       const res = await api.listConversations();
       setConversations(res.conversations);
+      // New messages may exist — refetch on the next search.
+      msgCache.current.clear();
     } catch {
       // ignore; pull-to-refresh will retry
     }
@@ -90,6 +107,74 @@ export default function ConversationsScreen({ navigation }: any) {
     return others.map((o) => o.displayName).join(", ") || "Conversation";
   }
 
+  // Run the search (debounced) whenever the query changes.
+  useEffect(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    const seq = ++searchSeq.current;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      // Make sure every conversation's recent messages are cached (decrypted).
+      for (const c of conversations) {
+        if (msgCache.current.has(c.id)) continue;
+        try {
+          const res = await api.listMessages(c.id);
+          msgCache.current.set(
+            c.id,
+            res.messages.map((m) => ({
+              id: m.id,
+              createdAt: m.createdAt,
+              mine: m.senderId === user?.id,
+              body: isEncrypted(m.body)
+                ? decryptMessage(m.body, user?.id ?? -1) ?? ""
+                : m.body,
+            }))
+          );
+        } catch {
+          msgCache.current.set(c.id, []);
+        }
+        if (seq !== searchSeq.current) return; // a newer search superseded us
+      }
+      if (seq !== searchSeq.current) return;
+
+      const out: SearchResult[] = [];
+      for (const c of conversations) {
+        if (titleFor(c).toLowerCase().includes(q)) out.push({ kind: "conv", conv: c });
+      }
+      outer: for (const c of conversations) {
+        for (const m of msgCache.current.get(c.id) || []) {
+          if (m.body.toLowerCase().includes(q)) {
+            out.push({ kind: "msg", conv: c, ...m });
+            if (out.length >= 60) break outer;
+          }
+        }
+      }
+      setResults(out);
+      setSearching(false);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, conversations, user?.id]);
+
+  function fmtWhen(iso: string) {
+    const d = new Date(iso.replace(" ", "T") + "Z");
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function openConversation(c: Conversation) {
+    navigation.navigate("Chat", {
+      conversationId: c.id,
+      title: titleFor(c),
+      peer: !c.isGroup ? c.members[0] : undefined,
+    });
+  }
+
+  const showingSearch = query.trim().length > 0;
+
   return (
     <View style={styles.container}>
       {/* faint bolt-in-bubble watermark behind the chat list */}
@@ -97,6 +182,71 @@ export default function ConversationsScreen({ navigation }: any) {
         source={require("../../assets/logo.png")}
         style={styles.watermark}
       />
+
+      {/* Search bar: matches chat names and message text (decrypted locally). */}
+      <View style={styles.searchWrap}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search messages"
+          placeholderTextColor={colors.textMuted}
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {query ? (
+          <TouchableOpacity onPress={() => setQuery("")} style={styles.searchClear}>
+            <Text style={{ color: colors.textMuted, fontSize: 16 }}>✕</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {showingSearch ? (
+        <FlatList
+          data={results}
+          keyExtractor={(r) => (r.kind === "conv" ? "c" + r.conv.id : "m" + r.id)}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptySub}>
+                {searching ? "Searching…" : "No matches."}
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const name = titleFor(item.conv);
+            if (item.kind === "conv") {
+              return (
+                <TouchableOpacity style={styles.row} onPress={() => openConversation(item.conv)}>
+                  <View style={styles.avatarWrap}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.rowBody}>
+                    <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
+                    <Text style={styles.rowPreview} numberOfLines={1}>Chat</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }
+            return (
+              <TouchableOpacity style={styles.row} onPress={() => openConversation(item.conv)}>
+                <View style={styles.rowBody}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
+                    <Text style={styles.resultTime}>{fmtWhen(item.createdAt)}</Text>
+                  </View>
+                  <Text style={styles.rowPreview} numberOfLines={2}>
+                    {(item.mine ? "You: " : "") + item.body}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      ) : (
       <FlatList
         data={conversations}
         keyExtractor={(c) => String(c.id)}
@@ -160,6 +310,7 @@ export default function ConversationsScreen({ navigation }: any) {
           );
         }}
       />
+      )}
     </View>
   );
 }
@@ -214,4 +365,20 @@ const makeStyles = (colors: ThemeColors) =>
   emptySub: { color: colors.textMuted, marginTop: 6 },
   headerBtn: { paddingHorizontal: 14 },
   headerBtnText: { color: colors.primary, fontSize: 26, fontWeight: "700" },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 6,
+    paddingHorizontal: 12,
+  },
+  searchIcon: { fontSize: 14, marginRight: 8 },
+  searchInput: { flex: 1, color: colors.text, fontSize: 15, paddingVertical: 9 },
+  searchClear: { padding: 6 },
+  resultTime: { color: colors.textMuted, fontSize: 12, marginLeft: 8 },
 });
