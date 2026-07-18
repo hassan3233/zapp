@@ -17,6 +17,15 @@ import { useT } from "../i18n/i18n";
 import { useTheme, type ThemeColors } from "../theme";
 import { ensureKeys, decryptMessage, isEncrypted } from "../crypto/e2ee";
 import { isVoiceBody } from "../components/VoiceMessage";
+import { isImageBody, isVideoBody } from "../components/MediaMessage";
+
+// Media bodies are huge base64 blobs — show a friendly label instead.
+function mediaLabel(body: string): string | null {
+  if (isVoiceBody(body)) return "🎤 Voice message";
+  if (isImageBody(body)) return "📷 Photo";
+  if (isVideoBody(body)) return "🎥 Video";
+  return null;
+}
 import { usePresence } from "../net/PresenceContext";
 import type { Conversation, Message } from "../types";
 
@@ -55,7 +64,7 @@ export default function ConversationsScreen({ navigation }: any) {
     let body = isEncrypted(raw)
       ? decryptMessage(raw, user?.id ?? -1) ?? "🔒 …"
       : raw;
-    if (isVoiceBody(body)) body = "🎤 Voice message";
+    body = mediaLabel(body) ?? body;
     return (c.lastMessage.senderId === user?.id ? t("conv.you") : "") + body;
   }
 
@@ -131,8 +140,8 @@ export default function ConversationsScreen({ navigation }: any) {
               let body = isEncrypted(m.body)
                 ? decryptMessage(m.body, user?.id ?? -1) ?? ""
                 : m.body;
-              // Voice notes are searchable by name, not by audio bytes.
-              if (isVoiceBody(body)) body = "🎤 Voice message";
+              // Media is searchable by label, not by raw bytes.
+              body = mediaLabel(body) ?? body;
               return {
                 id: m.id,
                 createdAt: m.createdAt,

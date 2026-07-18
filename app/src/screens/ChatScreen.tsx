@@ -34,7 +34,22 @@ import {
   makeVoiceBody,
   voiceAvailable,
 } from "../components/VoiceMessage";
+import {
+  ImageBubble,
+  VideoBubble,
+  isImageBody,
+  isVideoBody,
+  makeImageBody,
+  makeVideoBody,
+} from "../components/MediaMessage";
+import { Alert } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import type { Message, User } from "../types";
+
+// Keep raw media small enough that the encrypted+base64 body (~1.8x raw)
+// stays under the server's 8 MB socket limit.
+const MAX_MEDIA_B64 = 5_000_000;
 
 export default function ChatScreen({ route, navigation }: any) {
   const { conversationId, title } = route.params;
@@ -241,6 +256,60 @@ export default function ChatScreen({ route, navigation }: any) {
     sendBody(makeVoiceBody(base64, durationSec));
   }
 
+  // ---- Photo / video sending ----
+  async function handlePicked(asset: ImagePicker.ImagePickerAsset) {
+    try {
+      if (asset.type === "video") {
+        const b64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        if (b64.length > MAX_MEDIA_B64) {
+          Alert.alert("Video too large", "Please send a shorter video (about 15–20 seconds max).");
+          return;
+        }
+        sendBody(makeVideoBody(b64, (asset.duration || 0) / 1000));
+      } else {
+        const b64 =
+          asset.base64 ||
+          (await FileSystem.readAsStringAsync(asset.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          }));
+        if (b64.length > MAX_MEDIA_B64) {
+          Alert.alert("Photo too large", "This photo is too big to send.");
+          return;
+        }
+        sendBody(makeImageBody(b64));
+      }
+    } catch {
+      Alert.alert("Could not send", "Something went wrong reading that file.");
+    }
+  }
+
+  async function pickFromGallery() {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      quality: 0.6,
+      base64: true,
+      videoMaxDuration: 60,
+    });
+    if (!res.canceled && res.assets?.[0]) await handlePicked(res.assets[0]);
+  }
+
+  async function takePhoto() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return;
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.6, base64: true });
+    if (!res.canceled && res.assets?.[0]) await handlePicked(res.assets[0]);
+  }
+
+  function openAttachMenu() {
+    Alert.alert("Send media", "", [
+      { text: "📷 Take photo", onPress: takePhoto },
+      { text: "🖼 Photo or video", onPress: pickFromGallery },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
+
   function onChangeText(v: string) {
     setText(v);
     const socket = getSocket();
@@ -293,6 +362,10 @@ export default function ChatScreen({ route, navigation }: any) {
                   <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
                     🎤 Voice message
                   </Text>
+                ) : isImageBody(body) ? (
+                  <ImageBubble payload={body} />
+                ) : isVideoBody(body) ? (
+                  <VideoBubble payload={body} messageId={item.id} mine={mine} />
                 ) : (
                   <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
                     {body}
@@ -323,6 +396,9 @@ export default function ChatScreen({ route, navigation }: any) {
           { paddingBottom: kbVisible ? 8 : Math.max(insets.bottom + 8, 20) },
         ]}
       >
+        <TouchableOpacity onPress={openAttachMenu} style={styles.attachBtn}>
+          <Text style={{ fontSize: 20 }}>📎</Text>
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
           placeholder={t("chat.message")}
@@ -435,4 +511,11 @@ const makeStyles = (colors: ThemeColors) =>
   },
   sendBtnDisabled: { opacity: 0.5 },
   sendText: { color: colors.onPrimary, fontSize: 18, fontWeight: "800" },
+  attachBtn: {
+    width: 40,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 4,
+  },
 });
