@@ -16,6 +16,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useT } from "../i18n/i18n";
 import { useTheme, type ThemeColors } from "../theme";
 import { ensureKeys, decryptMessage, isEncrypted } from "../crypto/e2ee";
+import { isVoiceBody } from "../components/VoiceMessage";
 import { usePresence } from "../net/PresenceContext";
 import type { Conversation, Message } from "../types";
 
@@ -51,9 +52,10 @@ export default function ConversationsScreen({ navigation }: any) {
   function preview(c: Conversation): string {
     if (!c.lastMessage) return t("conv.noMessages");
     const raw = c.lastMessage.body;
-    const body = isEncrypted(raw)
+    let body = isEncrypted(raw)
       ? decryptMessage(raw, user?.id ?? -1) ?? "🔒 …"
       : raw;
+    if (isVoiceBody(body)) body = "🎤 Voice message";
     return (c.lastMessage.senderId === user?.id ? t("conv.you") : "") + body;
   }
 
@@ -125,14 +127,19 @@ export default function ConversationsScreen({ navigation }: any) {
           const res = await api.listMessages(c.id);
           msgCache.current.set(
             c.id,
-            res.messages.map((m) => ({
-              id: m.id,
-              createdAt: m.createdAt,
-              mine: m.senderId === user?.id,
-              body: isEncrypted(m.body)
+            res.messages.map((m) => {
+              let body = isEncrypted(m.body)
                 ? decryptMessage(m.body, user?.id ?? -1) ?? ""
-                : m.body,
-            }))
+                : m.body;
+              // Voice notes are searchable by name, not by audio bytes.
+              if (isVoiceBody(body)) body = "🎤 Voice message";
+              return {
+                id: m.id,
+                createdAt: m.createdAt,
+                mine: m.senderId === user?.id,
+                body,
+              };
+            })
           );
         } catch {
           msgCache.current.set(c.id, []);

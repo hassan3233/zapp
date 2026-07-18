@@ -27,6 +27,13 @@ import {
   cryptoAvailable,
 } from "../crypto/e2ee";
 import { usePresence } from "../net/PresenceContext";
+import {
+  VoiceRecorderBar,
+  VoiceBubble,
+  isVoiceBody,
+  makeVoiceBody,
+  voiceAvailable,
+} from "../components/VoiceMessage";
 import type { Message, User } from "../types";
 
 export default function ChatScreen({ route, navigation }: any) {
@@ -212,16 +219,26 @@ export default function ChatScreen({ route, navigation }: any) {
     };
   }, [conversationId, user?.id]);
 
-  function send() {
-    const plaintext = text.trim();
-    if (!plaintext) return;
-    // Encrypt for all members (incl. me); fall back to plaintext if we can't.
+  // Encrypt for all members (incl. me); fall back to plaintext if we can't.
+  function sendBody(raw: string) {
     const body =
-      (user?.id != null && encryptMessage(plaintext, members, user.id)) || plaintext;
+      (user?.id != null && encryptMessage(raw, members, user.id)) || raw;
     const socket = getSocket();
     socket?.emit("message:send", { conversationId, body });
     socket?.emit("typing", { conversationId, isTyping: false });
+  }
+
+  function send() {
+    const plaintext = text.trim();
+    if (!plaintext) return;
+    sendBody(plaintext);
     setText("");
+  }
+
+  const [recordingVoice, setRecordingVoice] = useState(false);
+  function sendVoice(base64: string, durationSec: number) {
+    setRecordingVoice(false);
+    sendBody(makeVoiceBody(base64, durationSec));
   }
 
   function onChangeText(v: string) {
@@ -256,6 +273,7 @@ export default function ChatScreen({ route, navigation }: any) {
         }
         renderItem={({ item }) => {
           const mine = item.senderId === user?.id;
+          const body = displayBody(item);
           return (
             <View
               style={[
@@ -269,9 +287,17 @@ export default function ChatScreen({ route, navigation }: any) {
                   mine ? styles.bubbleMine : styles.bubbleTheirs,
                 ]}
               >
-                <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
-                  {displayBody(item)}
-                </Text>
+                {isVoiceBody(body) && voiceAvailable ? (
+                  <VoiceBubble payload={body} messageId={item.id} mine={mine} />
+                ) : isVoiceBody(body) ? (
+                  <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                    🎤 Voice message
+                  </Text>
+                ) : (
+                  <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
+                    {body}
+                  </Text>
+                )}
                 <Text style={[styles.time, mine && styles.timeMine]}>
                   {formatTime(item.createdAt)}
                 </Text>
@@ -283,6 +309,14 @@ export default function ChatScreen({ route, navigation }: any) {
 
       {peerTyping ? <Text style={styles.typing}>typing…</Text> : null}
 
+      {recordingVoice ? (
+        <View style={{ paddingBottom: kbVisible ? 0 : Math.max(insets.bottom, 12), backgroundColor: colors.surface }}>
+          <VoiceRecorderBar
+            onCancel={() => setRecordingVoice(false)}
+            onSend={sendVoice}
+          />
+        </View>
+      ) : (
       <View
         style={[
           styles.composer,
@@ -298,14 +332,21 @@ export default function ChatScreen({ route, navigation }: any) {
           multiline
           onSubmitEditing={send}
         />
-        <TouchableOpacity
-          style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
-          onPress={send}
-          disabled={!text.trim()}
-        >
-          <Text style={styles.sendText}>➤</Text>
-        </TouchableOpacity>
+        {text.trim() ? (
+          <TouchableOpacity style={styles.sendBtn} onPress={send}>
+            <Text style={styles.sendText}>➤</Text>
+          </TouchableOpacity>
+        ) : voiceAvailable ? (
+          <TouchableOpacity style={styles.sendBtn} onPress={() => setRecordingVoice(true)}>
+            <Text style={styles.sendText}>🎤</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.sendBtn, styles.sendBtnDisabled]} disabled>
+            <Text style={styles.sendText}>➤</Text>
+          </TouchableOpacity>
+        )}
       </View>
+      )}
     </KeyboardAvoidingView>
   );
 }

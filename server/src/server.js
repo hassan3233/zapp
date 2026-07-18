@@ -20,7 +20,12 @@ app.use(cors());
 app.use(express.json({ limit: "8mb" }));
 
 const server = http.createServer(app);
-const io = new SocketServer(server, { cors: { origin: "*" } });
+// maxHttpBufferSize raised so voice messages (base64 audio in the encrypted
+// body) fit — the 1 MB default only allows ~45s of audio.
+const io = new SocketServer(server, {
+  cors: { origin: "*" },
+  maxHttpBufferSize: 8e6,
+});
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, name: "zapp" }));
 
