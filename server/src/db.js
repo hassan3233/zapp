@@ -80,6 +80,14 @@ db.exec(`
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Emoji reactions: one per user per message (changing replaces it).
+  CREATE TABLE IF NOT EXISTS reactions (
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    emoji      TEXT NOT NULL,
+    PRIMARY KEY (message_id, user_id)
+  );
+
   -- "Delete for me": per-user hidden messages (the row itself stays).
   CREATE TABLE IF NOT EXISTS hidden_messages (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -432,6 +432,53 @@ export function hideMessage(userId, messageId) {
   ).run(userId, messageId);
 }
 
+// ---- Reactions ----
+// Toggle: same emoji again removes it; a different emoji replaces it.
+// Returns the message's current reactions.
+export function setReaction(messageId, userId, emoji) {
+  const existing = db
+    .prepare("SELECT emoji FROM reactions WHERE message_id = ? AND user_id = ?")
+    .get(messageId, userId);
+  if (existing && existing.emoji === emoji) {
+    db.prepare("DELETE FROM reactions WHERE message_id = ? AND user_id = ?").run(
+      messageId,
+      userId
+    );
+  } else {
+    db.prepare(
+      `INSERT INTO reactions (message_id, user_id, emoji) VALUES (?, ?, ?)
+       ON CONFLICT(message_id, user_id) DO UPDATE SET emoji = excluded.emoji`
+    ).run(messageId, userId, emoji);
+  }
+  return getReactionsForMessage(messageId);
+}
+
+export function getReactionsForMessage(messageId) {
+  return db
+    .prepare("SELECT user_id, emoji FROM reactions WHERE message_id = ?")
+    .all(messageId)
+    .map((r) => ({ userId: r.user_id, emoji: r.emoji }));
+}
+
+// Attach reactions to a list of serialized messages in one query.
+export function attachReactions(messages) {
+  if (!messages.length) return messages;
+  const ids = messages.map((m) => m.id);
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT message_id, user_id, emoji FROM reactions WHERE message_id IN (${placeholders})`
+    )
+    .all(...ids);
+  const byMsg = new Map();
+  for (const r of rows) {
+    if (!byMsg.has(r.message_id)) byMsg.set(r.message_id, []);
+    byMsg.get(r.message_id).push({ userId: r.user_id, emoji: r.emoji });
+  }
+  for (const m of messages) m.reactions = byMsg.get(m.id) || [];
+  return messages;
+}
+
 // Edit a message's body (the client sends it already E2EE-encrypted).
 export function editMessage(messageId, body) {
   db.prepare(

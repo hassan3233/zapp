@@ -6,6 +6,7 @@ import {
   FlatList,
   Image,
   Keyboard,
+  Modal,
   Pressable,
   TouchableOpacity,
   StyleSheet,
@@ -222,7 +223,19 @@ export default function ChatScreen({ route, navigation }: any) {
     const onEdited = (msg: Message) => {
       if (msg.conversationId !== conversationId) return;
       decCache.current.delete(msg.id);
-      setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...msg, reactions: m.reactions } : m))
+      );
+    };
+    const onReaction = (p: {
+      conversationId: number;
+      messageId: number;
+      reactions: { userId: number; emoji: string }[];
+    }) => {
+      if (p.conversationId !== conversationId) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === p.messageId ? { ...m, reactions: p.reactions } : m))
+      );
     };
     const onTyping = (p: {
       conversationId: number;
@@ -237,6 +250,7 @@ export default function ChatScreen({ route, navigation }: any) {
     socket?.on("message:new", onNew);
     socket?.on("message:deleted", onDeleted);
     socket?.on("message:edited", onEdited);
+    socket?.on("message:reaction", onReaction);
     socket?.on("typing", onTyping);
 
     return () => {
@@ -245,6 +259,7 @@ export default function ChatScreen({ route, navigation }: any) {
       socket?.off("message:new", onNew);
       socket?.off("message:deleted", onDeleted);
       socket?.off("message:edited", onEdited);
+      socket?.off("message:reaction", onReaction);
       socket?.off("typing", onTyping);
     };
   }, [conversationId, user?.id]);
@@ -341,28 +356,35 @@ export default function ChatScreen({ route, navigation }: any) {
     }
   }
 
-  // Android alerts show at most 3 buttons, so the menu adapts per message:
-  // own text → Edit / Delete for everyone / Delete for me (tap outside = cancel).
+  // Long-press bottom sheet: emoji reactions on top + message actions below.
+  const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+  const [menuFor, setMenuFor] = useState<{ m: Message; body: string } | null>(null);
+
   function openMessageMenu(m: Message, body: string) {
-    const mine = m.senderId === user?.id;
-    const editable =
-      mine &&
-      !isVoiceBody(body) &&
-      !isImageBody(body) &&
-      !isVideoBody(body) &&
-      body !== "🔒 …";
-    const buttons: any[] = [];
-    if (editable) buttons.push({ text: "Edit", onPress: () => startEdit(m, body) });
-    if (mine) {
-      buttons.push({
-        text: "Delete for everyone",
-        style: "destructive",
-        onPress: () => doDelete(m.id, "everyone"),
-      });
+    setMenuFor({ m, body });
+  }
+
+  async function react(messageId: number, emoji: string) {
+    try {
+      const res = await api.reactMessage(conversationId, messageId, emoji);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, reactions: res.reactions } : m))
+      );
+    } catch (e: any) {
+      Alert.alert("Could not react", e.message || "Something went wrong.");
     }
-    buttons.push({ text: "Delete for me", onPress: () => doDelete(m.id, "me") });
-    if (buttons.length < 3) buttons.push({ text: "Cancel", style: "cancel" });
-    Alert.alert("Message", "", buttons.slice(0, 3), { cancelable: true });
+  }
+
+  // Aggregate raw reactions into chips: emoji → count, marking my own.
+  function aggregateReactions(m: Message) {
+    const byEmoji = new Map<string, { count: number; mine: boolean }>();
+    for (const r of m.reactions || []) {
+      const cur = byEmoji.get(r.emoji) || { count: 0, mine: false };
+      cur.count += 1;
+      if (r.userId === user?.id) cur.mine = true;
+      byEmoji.set(r.emoji, cur);
+    }
+    return [...byEmoji.entries()].map(([emoji, v]) => ({ emoji, ...v }));
   }
 
   // Attachment options live in an inline panel under the text bar (no popup).
@@ -460,6 +482,22 @@ export default function ChatScreen({ route, navigation }: any) {
                     {body}
                   </Text>
                 )}
+                {item.reactions?.length ? (
+                  <View style={styles.reactChips}>
+                    {aggregateReactions(item).map((r) => (
+                      <TouchableOpacity
+                        key={r.emoji}
+                        style={[styles.reactChip, r.mine && styles.reactChipMine]}
+                        onPress={() => react(item.id, r.emoji)}
+                      >
+                        <Text style={styles.reactChipText}>
+                          {r.emoji}
+                          {r.count > 1 ? ` ${r.count}` : ""}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
                 <Text style={[styles.time, mine && styles.timeMine]}>
                   {(item.editedAt ? "edited · " : "") + formatTime(item.createdAt)}
                 </Text>
@@ -555,6 +593,79 @@ export default function ChatScreen({ route, navigation }: any) {
       ) : null}
       </>
       )}
+
+      {/* Long-press sheet: reactions row + message actions. */}
+      {menuFor ? (
+        <Modal transparent animationType="fade" visible onRequestClose={() => setMenuFor(null)}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setMenuFor(null)}>
+            <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 10, 22) }]}>
+              <View style={styles.reactRow}>
+                {REACTION_EMOJIS.map((e) => (
+                  <TouchableOpacity
+                    key={e}
+                    style={styles.reactBtn}
+                    onPress={() => {
+                      const id = menuFor.m.id;
+                      setMenuFor(null);
+                      react(id, e);
+                    }}
+                  >
+                    <Text style={{ fontSize: 26 }}>{e}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {(() => {
+                const mine = menuFor.m.senderId === user?.id;
+                const editable =
+                  mine &&
+                  !isVoiceBody(menuFor.body) &&
+                  !isImageBody(menuFor.body) &&
+                  !isVideoBody(menuFor.body) &&
+                  menuFor.body !== "🔒 …";
+                return (
+                  <>
+                    {editable ? (
+                      <TouchableOpacity
+                        style={styles.sheetItem}
+                        onPress={() => {
+                          startEdit(menuFor.m, menuFor.body);
+                          setMenuFor(null);
+                        }}
+                      >
+                        <Text style={styles.sheetItemText}>✏️ Edit</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    {mine ? (
+                      <TouchableOpacity
+                        style={styles.sheetItem}
+                        onPress={() => {
+                          const id = menuFor.m.id;
+                          setMenuFor(null);
+                          doDelete(id, "everyone");
+                        }}
+                      >
+                        <Text style={[styles.sheetItemText, { color: colors.danger }]}>
+                          🗑 Delete for everyone
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
+                      style={styles.sheetItem}
+                      onPress={() => {
+                        const id = menuFor.m.id;
+                        setMenuFor(null);
+                        doDelete(id, "me");
+                      }}
+                    >
+                      <Text style={styles.sheetItemText}>🗑 Delete for me</Text>
+                    </TouchableOpacity>
+                  </>
+                );
+              })()}
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -650,6 +761,45 @@ const makeStyles = (colors: ThemeColors) =>
     justifyContent: "center",
     marginRight: 4,
   },
+  reactChips: { flexDirection: "row", flexWrap: "wrap", marginTop: 6, gap: 4 },
+  reactChip: {
+    backgroundColor: "rgba(0,0,0,0.08)",
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  reactChipMine: { borderColor: colors.primaryDark, backgroundColor: "rgba(0,0,0,0.14)" },
+  reactChipText: { fontSize: 12, color: colors.text },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 14,
+    paddingHorizontal: 16,
+  },
+  reactRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    paddingHorizontal: 4,
+  },
+  reactBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetItem: { paddingVertical: 13, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  sheetItemText: { color: colors.text, fontSize: 16, fontWeight: "600" },
   editBar: {
     flexDirection: "row",
     alignItems: "center",

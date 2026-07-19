@@ -15,6 +15,8 @@ export type User = {
   profileComplete: boolean;
 };
 
+export type Reaction = { userId: number; emoji: string };
+
 export type Message = {
   id: number;
   conversationId: number;
@@ -22,6 +24,7 @@ export type Message = {
   body: string;
   createdAt: string;
   editedAt?: string | null;
+  reactions?: Reaction[];
 };
 
 export type Conversation = {

@@ -13,6 +13,8 @@ import {
   deleteMessage,
   hideMessage,
   editMessage,
+  setReaction,
+  attachReactions,
 } from "../store.js";
 
 export default function conversationsRouter(io) {
@@ -77,7 +79,34 @@ export default function conversationsRouter(io) {
       return res.status(403).json({ error: "not a member of this conversation" });
     }
     const before = req.query.before ? Number(req.query.before) : undefined;
-    res.json({ messages: listMessages(convId, { before, forUserId: req.user.id }) });
+    res.json({
+      messages: attachReactions(
+        listMessages(convId, { before, forUserId: req.user.id })
+      ),
+    });
+  });
+
+  // PUT /api/conversations/:id/messages/:messageId/reaction { emoji }
+  // Toggles the caller's reaction and broadcasts the new set.
+  router.put("/:id/messages/:messageId/reaction", requireAuth, (req, res) => {
+    const convId = Number(req.params.id);
+    const messageId = Number(req.params.messageId);
+    if (!isMember(convId, req.user.id)) {
+      return res.status(403).json({ error: "not a member of this conversation" });
+    }
+    const msg = getMessageById(messageId);
+    if (!msg || msg.conversationId !== convId) {
+      return res.status(404).json({ error: "message not found" });
+    }
+    const emoji = (req.body?.emoji || "").toString().trim().slice(0, 8);
+    if (!emoji) return res.status(400).json({ error: "emoji is required" });
+    const reactions = setReaction(messageId, req.user.id, emoji);
+    io.to(`conversation:${convId}`).emit("message:reaction", {
+      conversationId: convId,
+      messageId,
+      reactions,
+    });
+    res.json({ reactions });
   });
 
   // PATCH /api/conversations/:id/messages/:messageId { body }

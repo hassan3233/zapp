@@ -85,6 +85,12 @@ export const api = {
       body: { reason },
     }),
 
+  reactMessage: (conversationId: number, messageId: number, emoji: string) =>
+    request<{ reactions: { userId: number; emoji: string }[] }>(
+      `/api/conversations/${conversationId}/messages/${messageId}/reaction`,
+      { method: "PUT", body: { emoji } }
+    ),
+
   editMessage: (conversationId: number, messageId: number, body: string) =>
     request<{ message: Message }>(
       `/api/conversations/${conversationId}/messages/${messageId}`,
