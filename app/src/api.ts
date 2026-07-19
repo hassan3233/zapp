@@ -85,6 +85,12 @@ export const api = {
       body: { reason },
     }),
 
+  deleteMessage: (conversationId: number, messageId: number, scope: "everyone" | "me") =>
+    request<{ ok: boolean }>(
+      `/api/conversations/${conversationId}/messages/${messageId}?scope=${scope}`,
+      { method: "DELETE" }
+    ),
+
   // Push-notification device token registration.
   registerPushToken: (token: string, platform?: string) =>
     request<{ ok: boolean }>("/api/users/push-token", {

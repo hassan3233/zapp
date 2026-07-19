@@ -42,12 +42,18 @@ function fmt(sec: number) {
 }
 
 // Inline photo that expands to a full-screen viewer when tapped.
-export function ImageBubble({ payload }: { payload: string }) {
+export function ImageBubble({
+  payload,
+  onLongPress,
+}: {
+  payload: string;
+  onLongPress?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const uri = useMemo(() => "data:image/jpeg;base64," + payload.slice(IMG_PREFIX.length), [payload]);
   return (
     <>
-      <TouchableOpacity onPress={() => setOpen(true)}>
+      <TouchableOpacity onPress={() => setOpen(true)} onLongPress={onLongPress} delayLongPress={400}>
         <Image source={{ uri }} style={{ width: 210, height: 210, borderRadius: 12 }} resizeMode="cover" />
       </TouchableOpacity>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -96,10 +102,12 @@ export function VideoBubble({
   payload,
   messageId,
   mine,
+  onLongPress,
 }: {
   payload: string;
   messageId: number;
   mine: boolean;
+  onLongPress?: () => void;
 }) {
   const colors = useTheme();
   const parsed = useMemo(() => {
@@ -138,6 +146,8 @@ export function VideoBubble({
     <>
       <TouchableOpacity
         onPress={openVideo}
+        onLongPress={onLongPress}
+        delayLongPress={400}
         style={{
           width: 210,
           height: 130,

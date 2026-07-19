@@ -9,6 +9,9 @@ import {
   createMessage,
   getUserById,
   createGroup,
+  getMessageById,
+  deleteMessage,
+  hideMessage,
 } from "../store.js";
 
 export default function conversationsRouter(io) {
@@ -73,7 +76,36 @@ export default function conversationsRouter(io) {
       return res.status(403).json({ error: "not a member of this conversation" });
     }
     const before = req.query.before ? Number(req.query.before) : undefined;
-    res.json({ messages: listMessages(convId, { before }) });
+    res.json({ messages: listMessages(convId, { before, forUserId: req.user.id }) });
+  });
+
+  // DELETE /api/conversations/:id/messages/:messageId?scope=everyone|me
+  // "everyone" (sender only) removes it for all members and broadcasts;
+  // "me" just hides it for the caller.
+  router.delete("/:id/messages/:messageId", requireAuth, (req, res) => {
+    const convId = Number(req.params.id);
+    const messageId = Number(req.params.messageId);
+    if (!isMember(convId, req.user.id)) {
+      return res.status(403).json({ error: "not a member of this conversation" });
+    }
+    const msg = getMessageById(messageId);
+    if (!msg || msg.conversationId !== convId) {
+      return res.status(404).json({ error: "message not found" });
+    }
+    const scope = req.query.scope === "everyone" ? "everyone" : "me";
+    if (scope === "everyone") {
+      if (msg.senderId !== req.user.id) {
+        return res.status(403).json({ error: "you can only delete your own messages for everyone" });
+      }
+      deleteMessage(messageId);
+      io.to(`conversation:${convId}`).emit("message:deleted", {
+        conversationId: convId,
+        messageId,
+      });
+    } else {
+      hideMessage(req.user.id, messageId);
+    }
+    res.json({ ok: true, scope });
   });
 
   // POST /api/conversations/:id/messages { body }

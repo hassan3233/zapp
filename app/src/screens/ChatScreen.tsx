@@ -6,6 +6,7 @@ import {
   FlatList,
   Image,
   Keyboard,
+  Pressable,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -213,6 +214,11 @@ export default function ChatScreen({ route, navigation }: any) {
         prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
       );
     };
+    const onDeleted = (p: { conversationId: number; messageId: number }) => {
+      if (p.conversationId !== conversationId) return;
+      decCache.current.delete(p.messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== p.messageId));
+    };
     const onTyping = (p: {
       conversationId: number;
       userId: number;
@@ -224,12 +230,14 @@ export default function ChatScreen({ route, navigation }: any) {
     };
 
     socket?.on("message:new", onNew);
+    socket?.on("message:deleted", onDeleted);
     socket?.on("typing", onTyping);
 
     return () => {
       active = false;
       socket?.emit("conversation:leave", conversationId);
       socket?.off("message:new", onNew);
+      socket?.off("message:deleted", onDeleted);
       socket?.off("typing", onTyping);
     };
   }, [conversationId, user?.id]);
@@ -283,6 +291,32 @@ export default function ChatScreen({ route, navigation }: any) {
     } catch {
       Alert.alert("Could not send", "Something went wrong reading that file.");
     }
+  }
+
+  // ---- Message deleting (long-press a bubble) ----
+  async function doDelete(messageId: number, scope: "everyone" | "me") {
+    try {
+      await api.deleteMessage(conversationId, messageId, scope);
+      decCache.current.delete(messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch (e: any) {
+      Alert.alert("Could not delete", e.message || "Something went wrong.");
+    }
+  }
+
+  function confirmDelete(m: Message) {
+    const mine = m.senderId === user?.id;
+    const buttons: any[] = [];
+    if (mine) {
+      buttons.push({
+        text: "Delete for everyone",
+        style: "destructive",
+        onPress: () => doDelete(m.id, "everyone"),
+      });
+    }
+    buttons.push({ text: "Delete for me", onPress: () => doDelete(m.id, "me") });
+    buttons.push({ text: "Cancel", style: "cancel" });
+    Alert.alert("Delete message?", "", buttons);
   }
 
   // Attachment options live in an inline panel under the text bar (no popup).
@@ -347,22 +381,34 @@ export default function ChatScreen({ route, navigation }: any) {
                 mine ? styles.rowMine : styles.rowTheirs,
               ]}
             >
-              <View
+              <Pressable
                 style={[
                   styles.bubble,
                   mine ? styles.bubbleMine : styles.bubbleTheirs,
                 ]}
+                onLongPress={() => confirmDelete(item)}
+                delayLongPress={400}
               >
                 {isVoiceBody(body) && voiceAvailable ? (
-                  <VoiceBubble payload={body} messageId={item.id} mine={mine} />
+                  <VoiceBubble
+                    payload={body}
+                    messageId={item.id}
+                    mine={mine}
+                    onLongPress={() => confirmDelete(item)}
+                  />
                 ) : isVoiceBody(body) ? (
                   <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
                     🎤 Voice message
                   </Text>
                 ) : isImageBody(body) ? (
-                  <ImageBubble payload={body} />
+                  <ImageBubble payload={body} onLongPress={() => confirmDelete(item)} />
                 ) : isVideoBody(body) ? (
-                  <VideoBubble payload={body} messageId={item.id} mine={mine} />
+                  <VideoBubble
+                    payload={body}
+                    messageId={item.id}
+                    mine={mine}
+                    onLongPress={() => confirmDelete(item)}
+                  />
                 ) : (
                   <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
                     {body}
@@ -371,7 +417,7 @@ export default function ChatScreen({ route, navigation }: any) {
                 <Text style={[styles.time, mine && styles.timeMine]}>
                   {formatTime(item.createdAt)}
                 </Text>
-              </View>
+              </Pressable>
             </View>
           );
         }}

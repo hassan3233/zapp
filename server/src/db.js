@@ -80,6 +80,13 @@ db.exec(`
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- "Delete for me": per-user hidden messages (the row itself stays).
+  CREATE TABLE IF NOT EXISTS hidden_messages (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, message_id)
+  );
+
   -- FCM device tokens for push notifications (a user may have several devices).
   CREATE TABLE IF NOT EXISTS push_tokens (
     token      TEXT PRIMARY KEY,

@@ -399,21 +399,37 @@ export function getMessageById(id) {
   return m ? serializeMessage(m) : null;
 }
 
-export function listMessages(conversationId, { before, limit = 50 } = {}) {
+export function listMessages(conversationId, { before, limit = 50, forUserId } = {}) {
+  // forUserId filters out messages that user deleted "for me".
+  const hidden = forUserId
+    ? " AND id NOT IN (SELECT message_id FROM hidden_messages WHERE user_id = ?)"
+    : "";
   const rows = before
     ? db
         .prepare(
-          `SELECT * FROM messages WHERE conversation_id = ? AND id < ?
+          `SELECT * FROM messages WHERE conversation_id = ? AND id < ?${hidden}
            ORDER BY id DESC LIMIT ?`
         )
-        .all(conversationId, before, limit)
+        .all(...(forUserId ? [conversationId, before, forUserId, limit] : [conversationId, before, limit]))
     : db
         .prepare(
-          `SELECT * FROM messages WHERE conversation_id = ?
+          `SELECT * FROM messages WHERE conversation_id = ?${hidden}
            ORDER BY id DESC LIMIT ?`
         )
-        .all(conversationId, limit);
+        .all(...(forUserId ? [conversationId, forUserId, limit] : [conversationId, limit]));
   return rows.reverse().map(serializeMessage);
+}
+
+// "Delete for everyone" — removes the row entirely.
+export function deleteMessage(messageId) {
+  db.prepare("DELETE FROM messages WHERE id = ?").run(messageId);
+}
+
+// "Delete for me" — hides the message for one user only.
+export function hideMessage(userId, messageId) {
+  db.prepare(
+    "INSERT OR IGNORE INTO hidden_messages (user_id, message_id) VALUES (?, ?)"
+  ).run(userId, messageId);
 }
 
 function serializeMessage(m) {

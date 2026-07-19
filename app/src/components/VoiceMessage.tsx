@@ -162,10 +162,12 @@ export function VoiceBubble({
   payload,
   messageId,
   mine,
+  onLongPress,
 }: {
   payload: string;
   messageId: number;
   mine: boolean;
+  onLongPress?: () => void;
 }) {
   const colors = useTheme();
   const parsed = useMemo(() => {
@@ -219,7 +221,12 @@ export function VoiceBubble({
   const shown = status?.playing ? Math.floor(status.currentTime || 0) : parsed.dur;
 
   return (
-    <TouchableOpacity onPress={toggle} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4 }}>
+    <TouchableOpacity
+      onPress={toggle}
+      onLongPress={onLongPress}
+      delayLongPress={400}
+      style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4 }}
+    >
       <View
         style={{
           width: 34,

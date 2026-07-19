@@ -92,8 +92,10 @@ export default function ConversationsScreen({ navigation }: any) {
     if (!socket) return;
     const onNew = (_msg: Message) => load();
     socket.on("message:new", onNew);
+    socket.on("message:deleted", onNew);
     return () => {
       socket.off("message:new", onNew);
+      socket.off("message:deleted", onNew);
     };
   }, [load]);
 
