@@ -285,7 +285,11 @@ export default function ChatScreen({ route, navigation }: any) {
     }
   }
 
+  // Attachment options live in an inline panel under the text bar (no popup).
+  const [attachOpen, setAttachOpen] = useState(false);
+
   async function pickFromGallery() {
+    setAttachOpen(false);
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images", "videos"],
       quality: 0.6,
@@ -296,18 +300,11 @@ export default function ChatScreen({ route, navigation }: any) {
   }
 
   async function takePhoto() {
+    setAttachOpen(false);
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return;
     const res = await ImagePicker.launchCameraAsync({ quality: 0.6, base64: true });
     if (!res.canceled && res.assets?.[0]) await handlePicked(res.assets[0]);
-  }
-
-  function openAttachMenu() {
-    Alert.alert("Send media", "", [
-      { text: "📷 Take photo", onPress: takePhoto },
-      { text: "🖼 Photo or video", onPress: pickFromGallery },
-      { text: "Cancel", style: "cancel" },
-    ]);
   }
 
   function onChangeText(v: string) {
@@ -390,14 +387,15 @@ export default function ChatScreen({ route, navigation }: any) {
           />
         </View>
       ) : (
+      <>
       <View
         style={[
           styles.composer,
-          { paddingBottom: kbVisible ? 8 : Math.max(insets.bottom + 8, 20) },
+          { paddingBottom: kbVisible || attachOpen ? 8 : Math.max(insets.bottom + 8, 20) },
         ]}
       >
-        <TouchableOpacity onPress={openAttachMenu} style={styles.attachBtn}>
-          <Text style={{ fontSize: 20 }}>📎</Text>
+        <TouchableOpacity onPress={() => setAttachOpen((o) => !o)} style={styles.attachBtn}>
+          <Text style={{ fontSize: 20 }}>{attachOpen ? "✕" : "📎"}</Text>
         </TouchableOpacity>
         <TextInput
           style={styles.input}
@@ -422,6 +420,30 @@ export default function ChatScreen({ route, navigation }: any) {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Attachment options — an inline panel under the text bar. */}
+      {attachOpen ? (
+        <View
+          style={[
+            styles.attachPanel,
+            { paddingBottom: kbVisible ? 10 : Math.max(insets.bottom + 10, 22) },
+          ]}
+        >
+          <TouchableOpacity style={styles.attachOption} onPress={takePhoto}>
+            <View style={styles.attachCircle}>
+              <Text style={{ fontSize: 26 }}>📷</Text>
+            </View>
+            <Text style={styles.attachLabel}>Camera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.attachOption} onPress={pickFromGallery}>
+            <View style={styles.attachCircle}>
+              <Text style={{ fontSize: 26 }}>🖼</Text>
+            </View>
+            <Text style={styles.attachLabel}>Gallery</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      </>
       )}
     </KeyboardAvoidingView>
   );
@@ -518,4 +540,24 @@ const makeStyles = (colors: ThemeColors) =>
     justifyContent: "center",
     marginRight: 4,
   },
+  attachPanel: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 40,
+    paddingTop: 14,
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  attachOption: { alignItems: "center" },
+  attachCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  attachLabel: { color: colors.textMuted, fontSize: 13, fontWeight: "600" },
 });
