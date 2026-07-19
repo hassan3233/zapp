@@ -21,6 +21,7 @@ export type Message = {
   senderId: number;
   body: string;
   createdAt: string;
+  editedAt?: string | null;
 };
 
 export type Conversation = {

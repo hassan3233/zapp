@@ -12,6 +12,7 @@ import {
   getMessageById,
   deleteMessage,
   hideMessage,
+  editMessage,
 } from "../store.js";
 
 export default function conversationsRouter(io) {
@@ -77,6 +78,28 @@ export default function conversationsRouter(io) {
     }
     const before = req.query.before ? Number(req.query.before) : undefined;
     res.json({ messages: listMessages(convId, { before, forUserId: req.user.id }) });
+  });
+
+  // PATCH /api/conversations/:id/messages/:messageId { body }
+  // Sender-only message editing; broadcasts the updated message.
+  router.patch("/:id/messages/:messageId", requireAuth, (req, res) => {
+    const convId = Number(req.params.id);
+    const messageId = Number(req.params.messageId);
+    if (!isMember(convId, req.user.id)) {
+      return res.status(403).json({ error: "not a member of this conversation" });
+    }
+    const msg = getMessageById(messageId);
+    if (!msg || msg.conversationId !== convId) {
+      return res.status(404).json({ error: "message not found" });
+    }
+    if (msg.senderId !== req.user.id) {
+      return res.status(403).json({ error: "you can only edit your own messages" });
+    }
+    const body = (req.body?.body || "").toString().trim();
+    if (!body) return res.status(400).json({ error: "message body is required" });
+    const updated = editMessage(messageId, body);
+    io.to(`conversation:${convId}`).emit("message:edited", updated);
+    res.json({ message: updated });
   });
 
   // DELETE /api/conversations/:id/messages/:messageId?scope=everyone|me

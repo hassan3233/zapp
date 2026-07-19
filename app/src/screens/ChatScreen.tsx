@@ -219,6 +219,11 @@ export default function ChatScreen({ route, navigation }: any) {
       decCache.current.delete(p.messageId);
       setMessages((prev) => prev.filter((m) => m.id !== p.messageId));
     };
+    const onEdited = (msg: Message) => {
+      if (msg.conversationId !== conversationId) return;
+      decCache.current.delete(msg.id);
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
+    };
     const onTyping = (p: {
       conversationId: number;
       userId: number;
@@ -231,6 +236,7 @@ export default function ChatScreen({ route, navigation }: any) {
 
     socket?.on("message:new", onNew);
     socket?.on("message:deleted", onDeleted);
+    socket?.on("message:edited", onEdited);
     socket?.on("typing", onTyping);
 
     return () => {
@@ -238,6 +244,7 @@ export default function ChatScreen({ route, navigation }: any) {
       socket?.emit("conversation:leave", conversationId);
       socket?.off("message:new", onNew);
       socket?.off("message:deleted", onDeleted);
+      socket?.off("message:edited", onEdited);
       socket?.off("typing", onTyping);
     };
   }, [conversationId, user?.id]);
@@ -293,20 +300,59 @@ export default function ChatScreen({ route, navigation }: any) {
     }
   }
 
-  // ---- Message deleting (long-press a bubble) ----
+  // ---- Message editing & deleting (long-press a bubble) ----
+  const [editing, setEditing] = useState<Message | null>(null);
+
   async function doDelete(messageId: number, scope: "everyone" | "me") {
     try {
       await api.deleteMessage(conversationId, messageId, scope);
       decCache.current.delete(messageId);
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      if (editing?.id === messageId) cancelEdit();
     } catch (e: any) {
       Alert.alert("Could not delete", e.message || "Something went wrong.");
     }
   }
 
-  function confirmDelete(m: Message) {
+  function startEdit(m: Message, body: string) {
+    setEditing(m);
+    setText(body);
+    setAttachOpen(false);
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setText("");
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    const plaintext = text.trim();
+    if (!plaintext) return;
+    const body =
+      (user?.id != null && encryptMessage(plaintext, members, user.id)) || plaintext;
+    try {
+      const res = await api.editMessage(conversationId, editing.id, body);
+      decCache.current.delete(editing.id);
+      setMessages((prev) => prev.map((m) => (m.id === editing.id ? res.message : m)));
+      cancelEdit();
+    } catch (e: any) {
+      Alert.alert("Could not edit", e.message || "Something went wrong.");
+    }
+  }
+
+  // Android alerts show at most 3 buttons, so the menu adapts per message:
+  // own text → Edit / Delete for everyone / Delete for me (tap outside = cancel).
+  function openMessageMenu(m: Message, body: string) {
     const mine = m.senderId === user?.id;
+    const editable =
+      mine &&
+      !isVoiceBody(body) &&
+      !isImageBody(body) &&
+      !isVideoBody(body) &&
+      body !== "🔒 …";
     const buttons: any[] = [];
+    if (editable) buttons.push({ text: "Edit", onPress: () => startEdit(m, body) });
     if (mine) {
       buttons.push({
         text: "Delete for everyone",
@@ -315,8 +361,8 @@ export default function ChatScreen({ route, navigation }: any) {
       });
     }
     buttons.push({ text: "Delete for me", onPress: () => doDelete(m.id, "me") });
-    buttons.push({ text: "Cancel", style: "cancel" });
-    Alert.alert("Delete message?", "", buttons);
+    if (buttons.length < 3) buttons.push({ text: "Cancel", style: "cancel" });
+    Alert.alert("Message", "", buttons.slice(0, 3), { cancelable: true });
   }
 
   // Attachment options live in an inline panel under the text bar (no popup).
@@ -386,7 +432,7 @@ export default function ChatScreen({ route, navigation }: any) {
                   styles.bubble,
                   mine ? styles.bubbleMine : styles.bubbleTheirs,
                 ]}
-                onLongPress={() => confirmDelete(item)}
+                onLongPress={() => openMessageMenu(item, body)}
                 delayLongPress={400}
               >
                 {isVoiceBody(body) && voiceAvailable ? (
@@ -394,20 +440,20 @@ export default function ChatScreen({ route, navigation }: any) {
                     payload={body}
                     messageId={item.id}
                     mine={mine}
-                    onLongPress={() => confirmDelete(item)}
+                    onLongPress={() => openMessageMenu(item, body)}
                   />
                 ) : isVoiceBody(body) ? (
                   <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
                     🎤 Voice message
                   </Text>
                 ) : isImageBody(body) ? (
-                  <ImageBubble payload={body} onLongPress={() => confirmDelete(item)} />
+                  <ImageBubble payload={body} onLongPress={() => openMessageMenu(item, body)} />
                 ) : isVideoBody(body) ? (
                   <VideoBubble
                     payload={body}
                     messageId={item.id}
                     mine={mine}
-                    onLongPress={() => confirmDelete(item)}
+                    onLongPress={() => openMessageMenu(item, body)}
                   />
                 ) : (
                   <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
@@ -415,7 +461,7 @@ export default function ChatScreen({ route, navigation }: any) {
                   </Text>
                 )}
                 <Text style={[styles.time, mine && styles.timeMine]}>
-                  {formatTime(item.createdAt)}
+                  {(item.editedAt ? "edited · " : "") + formatTime(item.createdAt)}
                 </Text>
               </Pressable>
             </View>
@@ -434,6 +480,16 @@ export default function ChatScreen({ route, navigation }: any) {
         </View>
       ) : (
       <>
+      {editing ? (
+        <View style={styles.editBar}>
+          <Text style={styles.editBarText} numberOfLines={1}>
+            ✏️ Editing message
+          </Text>
+          <TouchableOpacity onPress={cancelEdit} style={{ padding: 8 }}>
+            <Text style={{ color: colors.textMuted, fontSize: 16 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <View
         style={[
           styles.composer,
@@ -450,9 +506,17 @@ export default function ChatScreen({ route, navigation }: any) {
           value={text}
           onChangeText={onChangeText}
           multiline
-          onSubmitEditing={send}
+          onSubmitEditing={editing ? saveEdit : send}
         />
-        {text.trim() ? (
+        {editing ? (
+          <TouchableOpacity
+            style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
+            onPress={saveEdit}
+            disabled={!text.trim()}
+          >
+            <Text style={styles.sendText}>✓</Text>
+          </TouchableOpacity>
+        ) : text.trim() ? (
           <TouchableOpacity style={styles.sendBtn} onPress={send}>
             <Text style={styles.sendText}>➤</Text>
           </TouchableOpacity>
@@ -586,6 +650,18 @@ const makeStyles = (colors: ThemeColors) =>
     justifyContent: "center",
     marginRight: 4,
   },
+  editBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingVertical: 6,
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  editBarText: { color: colors.primary, fontSize: 13, fontWeight: "600", flex: 1 },
   attachPanel: {
     flexDirection: "row",
     justifyContent: "center",

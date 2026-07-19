@@ -103,6 +103,10 @@ db.exec(`
 `);
 
 // Migrations: add columns to databases created before these features existed.
+const msgCols = db.prepare("PRAGMA table_info(messages)").all();
+if (!msgCols.some((c) => c.name === "edited_at")) {
+  db.exec("ALTER TABLE messages ADD COLUMN edited_at TEXT");
+}
 const userCols = db.prepare("PRAGMA table_info(users)").all();
 if (!userCols.some((c) => c.name === "public_key")) {
   db.exec("ALTER TABLE users ADD COLUMN public_key TEXT");

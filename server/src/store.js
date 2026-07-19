@@ -432,6 +432,14 @@ export function hideMessage(userId, messageId) {
   ).run(userId, messageId);
 }
 
+// Edit a message's body (the client sends it already E2EE-encrypted).
+export function editMessage(messageId, body) {
+  db.prepare(
+    "UPDATE messages SET body = ?, edited_at = datetime('now') WHERE id = ?"
+  ).run(body, messageId);
+  return getMessageById(messageId);
+}
+
 function serializeMessage(m) {
   return {
     id: m.id,
@@ -439,6 +447,7 @@ function serializeMessage(m) {
     senderId: m.sender_id,
     body: m.body,
     createdAt: m.created_at,
+    editedAt: m.edited_at || null,
   };
 }
 

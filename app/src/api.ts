@@ -85,6 +85,12 @@ export const api = {
       body: { reason },
     }),
 
+  editMessage: (conversationId: number, messageId: number, body: string) =>
+    request<{ message: Message }>(
+      `/api/conversations/${conversationId}/messages/${messageId}`,
+      { method: "PATCH", body: { body } }
+    ),
+
   deleteMessage: (conversationId: number, messageId: number, scope: "everyone" | "me") =>
     request<{ ok: boolean }>(
       `/api/conversations/${conversationId}/messages/${messageId}?scope=${scope}`,
