@@ -15,6 +15,11 @@ import {
   editMessage,
   setReaction,
   attachReactions,
+  setStar,
+  attachStarred,
+  getStarredMessages,
+  setPinned,
+  getPinnedMessage,
 } from "../store.js";
 
 export default function conversationsRouter(io) {
@@ -80,10 +85,59 @@ export default function conversationsRouter(io) {
     }
     const before = req.query.before ? Number(req.query.before) : undefined;
     res.json({
-      messages: attachReactions(
-        listMessages(convId, { before, forUserId: req.user.id })
+      messages: attachStarred(
+        attachReactions(listMessages(convId, { before, forUserId: req.user.id })),
+        req.user.id
       ),
+      pinnedMessage: getPinnedMessage(convId),
     });
+  });
+
+  // Starred (personal) — star/unstar + list.
+  router.put("/:id/messages/:messageId/star", requireAuth, (req, res) => {
+    const convId = Number(req.params.id);
+    if (!isMember(convId, req.user.id)) {
+      return res.status(403).json({ error: "not a member of this conversation" });
+    }
+    setStar(req.user.id, Number(req.params.messageId), req.body?.starred !== false);
+    res.json({ ok: true });
+  });
+
+  router.get("/:id/starred", requireAuth, (req, res) => {
+    const convId = Number(req.params.id);
+    if (!isMember(convId, req.user.id)) {
+      return res.status(403).json({ error: "not a member of this conversation" });
+    }
+    res.json({ messages: attachReactions(getStarredMessages(req.user.id, convId)) });
+  });
+
+  // Pinned (shared) — pin/unpin, broadcast to the room.
+  router.put("/:id/pin", requireAuth, (req, res) => {
+    const convId = Number(req.params.id);
+    if (!isMember(convId, req.user.id)) {
+      return res.status(403).json({ error: "not a member of this conversation" });
+    }
+    const messageId = req.body?.messageId ? Number(req.body.messageId) : null;
+    setPinned(convId, messageId);
+    const pinnedMessage = getPinnedMessage(convId);
+    io.to(`conversation:${convId}`).emit("message:pinned", {
+      conversationId: convId,
+      pinnedMessage,
+    });
+    res.json({ pinnedMessage });
+  });
+
+  router.delete("/:id/pin", requireAuth, (req, res) => {
+    const convId = Number(req.params.id);
+    if (!isMember(convId, req.user.id)) {
+      return res.status(403).json({ error: "not a member of this conversation" });
+    }
+    setPinned(convId, null);
+    io.to(`conversation:${convId}`).emit("message:pinned", {
+      conversationId: convId,
+      pinnedMessage: null,
+    });
+    res.json({ ok: true });
   });
 
   // PUT /api/conversations/:id/messages/:messageId/reaction { emoji }

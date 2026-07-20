@@ -160,9 +160,13 @@ export default function ChatScreen({ route, navigation }: any) {
           </View>
         </TouchableOpacity>
       ),
-      headerRight: peer
-        ? () => (
-            <View style={{ flexDirection: "row" }}>
+      headerRight: () => (
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <TouchableOpacity onPress={openStarred} style={{ paddingHorizontal: 10 }}>
+            <Text style={{ fontSize: 19 }}>⭐</Text>
+          </TouchableOpacity>
+          {peer ? (
+            <>
               <TouchableOpacity
                 onPress={() => startCall(peer, "audio")}
                 style={{ paddingHorizontal: 10 }}
@@ -175,9 +179,10 @@ export default function ChatScreen({ route, navigation }: any) {
               >
                 <Text style={{ fontSize: 20 }}>📹</Text>
               </TouchableOpacity>
-            </View>
-          )
-        : undefined,
+            </>
+          ) : null}
+        </View>
+      ),
     });
   }, [navigation, title, peer, startCall, statusText, peerOnline, colors]);
 
@@ -201,7 +206,10 @@ export default function ChatScreen({ route, navigation }: any) {
       }
       try {
         const res = await api.listMessages(conversationId);
-        if (active) setMessages(res.messages);
+        if (active) {
+          setMessages(res.messages);
+          setPinned(res.pinnedMessage ?? null);
+        }
       } catch {
         // ignore
       }
@@ -247,10 +255,16 @@ export default function ChatScreen({ route, navigation }: any) {
       }
     };
 
+    const onPinned = (p: { conversationId: number; pinnedMessage: Message | null }) => {
+      if (p.conversationId !== conversationId) return;
+      setPinned(p.pinnedMessage);
+    };
+
     socket?.on("message:new", onNew);
     socket?.on("message:deleted", onDeleted);
     socket?.on("message:edited", onEdited);
     socket?.on("message:reaction", onReaction);
+    socket?.on("message:pinned", onPinned);
     socket?.on("typing", onTyping);
 
     return () => {
@@ -260,12 +274,53 @@ export default function ChatScreen({ route, navigation }: any) {
       socket?.off("message:deleted", onDeleted);
       socket?.off("message:edited", onEdited);
       socket?.off("message:reaction", onReaction);
+      socket?.off("message:pinned", onPinned);
       socket?.off("typing", onTyping);
     };
   }, [conversationId, user?.id]);
 
   // The message currently being replied to (quoted), if any.
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  // Shared pinned message for this conversation (null = none).
+  const [pinned, setPinned] = useState<Message | null>(null);
+  // Starred-messages viewer.
+  const [starredOpen, setStarredOpen] = useState(false);
+  const [starredMsgs, setStarredMsgs] = useState<Message[]>([]);
+
+  async function toggleStar(m: Message) {
+    const next = !m.starred;
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, starred: next } : x)));
+    try {
+      await api.starMessage(conversationId, m.id, next);
+    } catch {
+      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, starred: !next } : x)));
+    }
+  }
+
+  async function togglePin(m: Message) {
+    const unpin = pinned?.id === m.id;
+    try {
+      if (unpin) {
+        await api.unpinMessage(conversationId);
+        setPinned(null);
+      } else {
+        const res = await api.pinMessage(conversationId, m.id);
+        setPinned(res.pinnedMessage ?? m);
+      }
+    } catch (e: any) {
+      Alert.alert("Could not pin", e.message || "Something went wrong.");
+    }
+  }
+
+  async function openStarred() {
+    setStarredOpen(true);
+    try {
+      const res = await api.listStarred(conversationId);
+      setStarredMsgs(res.messages);
+    } catch {
+      setStarredMsgs([]);
+    }
+  }
 
   // Encrypt for all members (incl. me); fall back to plaintext if we can't.
   function sendBody(raw: string, replyTo?: number) {
@@ -493,6 +548,25 @@ export default function ChatScreen({ route, navigation }: any) {
         </View>
       ) : null}
 
+      {pinned ? (
+        <TouchableOpacity
+          style={styles.pinnedBar}
+          onPress={() => scrollToMessage(pinned.id)}
+          activeOpacity={0.7}
+        >
+          <Text style={{ fontSize: 15, marginRight: 8 }}>📌</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pinnedTitle}>Pinned message</Text>
+            <Text style={styles.pinnedText} numberOfLines={1}>
+              {quotedLabel(pinned).text}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => togglePin(pinned)} style={{ padding: 6 }}>
+            <Text style={{ color: colors.textMuted, fontSize: 15 }}>✕</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      ) : null}
+
       <FlatList
         ref={listRef}
         data={messages}
@@ -590,7 +664,9 @@ export default function ChatScreen({ route, navigation }: any) {
                   </View>
                 ) : null}
                 <Text style={[styles.time, mine && styles.timeMine]}>
-                  {(item.editedAt ? "edited · " : "") + formatTime(item.createdAt)}
+                  {(item.starred ? "⭐ " : "") +
+                    (item.editedAt ? "edited · " : "") +
+                    formatTime(item.createdAt)}
                 </Text>
               </Pressable>
             </View>
@@ -738,6 +814,30 @@ export default function ChatScreen({ route, navigation }: any) {
                     >
                       <Text style={styles.sheetItemText}>↩️ Reply</Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.sheetItem}
+                      onPress={() => {
+                        const m = menuFor.m;
+                        setMenuFor(null);
+                        toggleStar(m);
+                      }}
+                    >
+                      <Text style={styles.sheetItemText}>
+                        {menuFor.m.starred ? "☆ Unstar" : "⭐ Star"}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.sheetItem}
+                      onPress={() => {
+                        const m = menuFor.m;
+                        setMenuFor(null);
+                        togglePin(m);
+                      }}
+                    >
+                      <Text style={styles.sheetItemText}>
+                        {pinned?.id === menuFor.m.id ? "📌 Unpin" : "📌 Pin"}
+                      </Text>
+                    </TouchableOpacity>
                     {menuFor.body !== "🔒 …" ? (
                       <TouchableOpacity
                         style={styles.sheetItem}
@@ -815,6 +915,45 @@ export default function ChatScreen({ route, navigation }: any) {
                 }}
                 ListEmptyComponent={
                   <Text style={{ color: colors.textMuted, paddingVertical: 16 }}>No chats yet.</Text>
+                }
+              />
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+
+      {/* Starred messages viewer. */}
+      {starredOpen ? (
+        <Modal transparent animationType="fade" visible onRequestClose={() => setStarredOpen(false)}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setStarredOpen(false)}>
+            <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 10, 22), maxHeight: "65%" }]}>
+              <Text style={styles.sheetTitle}>⭐ Starred messages</Text>
+              <FlatList
+                data={starredMsgs}
+                keyExtractor={(m) => String(m.id)}
+                renderItem={({ item }) => {
+                  const q = quotedLabel(item);
+                  return (
+                    <TouchableOpacity
+                      style={styles.sheetItem}
+                      onPress={() => {
+                        setStarredOpen(false);
+                        setTimeout(() => scrollToMessage(item.id), 250);
+                      }}
+                    >
+                      <Text style={{ color: colors.primaryDark, fontSize: 12, fontWeight: "700" }}>
+                        {q.sender} · {formatTime(item.createdAt)}
+                      </Text>
+                      <Text style={{ color: colors.text, fontSize: 15 }} numberOfLines={2}>
+                        {q.text}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }}
+                ListEmptyComponent={
+                  <Text style={{ color: colors.textMuted, paddingVertical: 16 }}>
+                    No starred messages yet. Long-press a message and tap ⭐ Star.
+                  </Text>
                 }
               />
             </Pressable>
@@ -916,6 +1055,17 @@ const makeStyles = (colors: ThemeColors) =>
     justifyContent: "center",
     marginRight: 4,
   },
+  pinnedBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  pinnedTitle: { color: colors.primaryDark, fontSize: 12, fontWeight: "700" },
+  pinnedText: { color: colors.textMuted, fontSize: 14 },
   quoteBlock: {
     borderLeftWidth: 3,
     borderLeftColor: colors.primary,

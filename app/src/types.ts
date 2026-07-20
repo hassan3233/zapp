@@ -26,6 +26,7 @@ export type Message = {
   editedAt?: string | null;
   reactions?: Reaction[];
   replyTo?: number | null;
+  starred?: boolean;
 };
 
 export type Conversation = {

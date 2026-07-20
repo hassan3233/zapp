@@ -479,6 +479,64 @@ export function attachReactions(messages) {
   return messages;
 }
 
+// ---- Starred (personal) ----
+export function setStar(userId, messageId, on) {
+  if (on) {
+    db.prepare(
+      "INSERT OR IGNORE INTO starred_messages (user_id, message_id) VALUES (?, ?)"
+    ).run(userId, messageId);
+  } else {
+    db.prepare(
+      "DELETE FROM starred_messages WHERE user_id = ? AND message_id = ?"
+    ).run(userId, messageId);
+  }
+}
+
+// Mark each serialized message with whether the given user starred it.
+export function attachStarred(messages, userId) {
+  if (!messages.length) return messages;
+  const ids = messages.map((m) => m.id);
+  const placeholders = ids.map(() => "?").join(",");
+  const starred = new Set(
+    db
+      .prepare(
+        `SELECT message_id FROM starred_messages WHERE user_id = ? AND message_id IN (${placeholders})`
+      )
+      .all(userId, ...ids)
+      .map((r) => r.message_id)
+  );
+  for (const m of messages) m.starred = starred.has(m.id);
+  return messages;
+}
+
+export function getStarredMessages(userId, conversationId) {
+  const rows = db
+    .prepare(
+      `SELECT m.* FROM starred_messages s
+       JOIN messages m ON m.id = s.message_id
+       WHERE s.user_id = ? AND m.conversation_id = ?
+       ORDER BY m.id DESC`
+    )
+    .all(userId, conversationId);
+  return rows.map(serializeMessage).map((m) => ({ ...m, starred: true }));
+}
+
+// ---- Pinned (shared per conversation) ----
+export function setPinned(conversationId, messageId) {
+  db.prepare("UPDATE conversations SET pinned_message_id = ? WHERE id = ?").run(
+    messageId ?? null,
+    conversationId
+  );
+}
+
+export function getPinnedMessage(conversationId) {
+  const conv = db
+    .prepare("SELECT pinned_message_id FROM conversations WHERE id = ?")
+    .get(conversationId);
+  if (!conv?.pinned_message_id) return null;
+  return getMessageById(conv.pinned_message_id);
+}
+
 // Edit a message's body (the client sends it already E2EE-encrypted).
 export function editMessage(messageId, body) {
   db.prepare(

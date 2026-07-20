@@ -80,6 +80,13 @@ db.exec(`
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Personal starred/bookmarked messages (per user).
+  CREATE TABLE IF NOT EXISTS starred_messages (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, message_id)
+  );
+
   -- Emoji reactions: one per user per message (changing replaces it).
   CREATE TABLE IF NOT EXISTS reactions (
     message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -117,6 +124,11 @@ if (!msgCols.some((c) => c.name === "edited_at")) {
 }
 if (!msgCols.some((c) => c.name === "reply_to")) {
   db.exec("ALTER TABLE messages ADD COLUMN reply_to INTEGER");
+}
+// A conversation can have one pinned message (shared with all members).
+const convCols = db.prepare("PRAGMA table_info(conversations)").all();
+if (!convCols.some((c) => c.name === "pinned_message_id")) {
+  db.exec("ALTER TABLE conversations ADD COLUMN pinned_message_id INTEGER");
 }
 const userCols = db.prepare("PRAGMA table_info(users)").all();
 if (!userCols.some((c) => c.name === "public_key")) {

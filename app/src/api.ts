@@ -85,6 +85,21 @@ export const api = {
       body: { reason },
     }),
 
+  starMessage: (conversationId: number, messageId: number, starred: boolean) =>
+    request<{ ok: boolean }>(
+      `/api/conversations/${conversationId}/messages/${messageId}/star`,
+      { method: "PUT", body: { starred } }
+    ),
+  listStarred: (conversationId: number) =>
+    request<{ messages: Message[] }>(`/api/conversations/${conversationId}/starred`),
+  pinMessage: (conversationId: number, messageId: number) =>
+    request<{ pinnedMessage: Message | null }>(`/api/conversations/${conversationId}/pin`, {
+      method: "PUT",
+      body: { messageId },
+    }),
+  unpinMessage: (conversationId: number) =>
+    request<{ ok: boolean }>(`/api/conversations/${conversationId}/pin`, { method: "DELETE" }),
+
   reactMessage: (conversationId: number, messageId: number, emoji: string) =>
     request<{ reactions: { userId: number; emoji: string }[] }>(
       `/api/conversations/${conversationId}/messages/${messageId}/reaction`,
@@ -133,7 +148,7 @@ export const api = {
   listCalls: () => request<{ calls: Call[] }>("/api/calls"),
 
   listMessages: (conversationId: number, before?: number) =>
-    request<{ messages: Message[] }>(
+    request<{ messages: Message[]; pinnedMessage?: Message | null }>(
       `/api/conversations/${conversationId}/messages` +
         (before ? `?before=${before}` : "")
     ),
