@@ -385,12 +385,12 @@ export function listConversations(userId) {
 }
 
 // ---- Messages ----
-export function createMessage({ conversationId, senderId, body }) {
+export function createMessage({ conversationId, senderId, body, replyTo }) {
   const info = db
     .prepare(
-      "INSERT INTO messages (conversation_id, sender_id, body) VALUES (?, ?, ?)"
+      "INSERT INTO messages (conversation_id, sender_id, body, reply_to) VALUES (?, ?, ?, ?)"
     )
-    .run(conversationId, senderId, body);
+    .run(conversationId, senderId, body, replyTo ?? null);
   return getMessageById(Number(info.lastInsertRowid));
 }
 
@@ -495,6 +495,7 @@ function serializeMessage(m) {
     body: m.body,
     createdAt: m.created_at,
     editedAt: m.edited_at || null,
+    replyTo: m.reply_to || null,
   };
 }
 

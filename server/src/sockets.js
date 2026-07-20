@@ -113,7 +113,7 @@ export function registerSockets(io) {
     });
 
     // Send a message over the socket (real-time path).
-    socket.on("message:send", ({ conversationId, body } = {}, ack) => {
+    socket.on("message:send", ({ conversationId, body, replyTo } = {}, ack) => {
       const convId = Number(conversationId);
       const text = (body || "").toString().trim();
       if (!text) {
@@ -139,6 +139,7 @@ export function registerSockets(io) {
         conversationId: convId,
         senderId: socket.user.id,
         body: text,
+        replyTo: replyTo ? Number(replyTo) : null,
       });
       io.to(`conversation:${convId}`).emit("message:new", message);
       // Push to any member who isn't currently connected (locked / app closed).

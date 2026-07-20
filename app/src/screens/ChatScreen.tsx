@@ -264,20 +264,44 @@ export default function ChatScreen({ route, navigation }: any) {
     };
   }, [conversationId, user?.id]);
 
+  // The message currently being replied to (quoted), if any.
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+
   // Encrypt for all members (incl. me); fall back to plaintext if we can't.
-  function sendBody(raw: string) {
+  function sendBody(raw: string, replyTo?: number) {
     const body =
       (user?.id != null && encryptMessage(raw, members, user.id)) || raw;
     const socket = getSocket();
-    socket?.emit("message:send", { conversationId, body });
+    socket?.emit("message:send", { conversationId, body, replyTo });
     socket?.emit("typing", { conversationId, isTyping: false });
   }
 
   function send() {
     const plaintext = text.trim();
     if (!plaintext) return;
-    sendBody(plaintext);
+    sendBody(plaintext, replyingTo?.id);
     setText("");
+    setReplyingTo(null);
+  }
+
+  // A one-line label for a quoted message (name + snippet), media-aware.
+  function quotedLabel(m: Message): { sender: string; text: string } {
+    const sender = m.senderId === user?.id ? "You" : peer?.displayName || title || "";
+    let body = displayBody(m);
+    if (isVoiceBody(body)) body = "🎤 Voice message";
+    else if (isImageBody(body)) body = "📷 Photo";
+    else if (isVideoBody(body)) body = "🎥 Video";
+    return { sender, text: body };
+  }
+
+  function scrollToMessage(id: number) {
+    const idx = messages.findIndex((m) => m.id === id);
+    if (idx < 0) return;
+    try {
+      listRef.current?.scrollToIndex({ index: idx, viewPosition: 0.4 });
+    } catch {
+      /* onScrollToIndexFailed handles the retry */
+    }
   }
 
   const [recordingVoice, setRecordingVoice] = useState(false);
@@ -477,6 +501,15 @@ export default function ChatScreen({ route, navigation }: any) {
         onContentSizeChange={() =>
           listRef.current?.scrollToEnd({ animated: true })
         }
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            try {
+              listRef.current?.scrollToIndex({ index: info.index, viewPosition: 0.4 });
+            } catch {
+              /* give up quietly */
+            }
+          }, 300);
+        }}
         renderItem={({ item }) => {
           const mine = item.senderId === user?.id;
           const body = displayBody(item);
@@ -495,6 +528,26 @@ export default function ChatScreen({ route, navigation }: any) {
                 onLongPress={() => openMessageMenu(item, body)}
                 delayLongPress={400}
               >
+                {item.replyTo ? (
+                  (() => {
+                    const orig = messages.find((mm) => mm.id === item.replyTo);
+                    const q = orig ? quotedLabel(orig) : null;
+                    return (
+                      <TouchableOpacity
+                        style={[styles.quoteBlock, mine && styles.quoteBlockMine]}
+                        onPress={() => item.replyTo && scrollToMessage(item.replyTo)}
+                        disabled={!orig}
+                      >
+                        <Text style={[styles.quoteSender, mine && styles.quoteTextMine]} numberOfLines={1}>
+                          {q ? q.sender : ""}
+                        </Text>
+                        <Text style={[styles.quoteText, mine && styles.quoteTextMine]} numberOfLines={1}>
+                          {q ? q.text : "Message"}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })()
+                ) : null}
                 {isVoiceBody(body) && voiceAvailable ? (
                   <VoiceBubble
                     payload={body}
@@ -562,6 +615,20 @@ export default function ChatScreen({ route, navigation }: any) {
             ✏️ Editing message
           </Text>
           <TouchableOpacity onPress={cancelEdit} style={{ padding: 8 }}>
+            <Text style={{ color: colors.textMuted, fontSize: 16 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      ) : replyingTo ? (
+        <View style={styles.editBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.editBarText} numberOfLines={1}>
+              ↩️ Replying to {quotedLabel(replyingTo).sender}
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }} numberOfLines={1}>
+              {quotedLabel(replyingTo).text}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={() => setReplyingTo(null)} style={{ padding: 8 }}>
             <Text style={{ color: colors.textMuted, fontSize: 16 }}>✕</Text>
           </TouchableOpacity>
         </View>
@@ -662,6 +729,15 @@ export default function ChatScreen({ route, navigation }: any) {
                   menuFor.body !== "🔒 …";
                 return (
                   <>
+                    <TouchableOpacity
+                      style={styles.sheetItem}
+                      onPress={() => {
+                        setReplyingTo(menuFor.m);
+                        setMenuFor(null);
+                      }}
+                    >
+                      <Text style={styles.sheetItemText}>↩️ Reply</Text>
+                    </TouchableOpacity>
                     {menuFor.body !== "🔒 …" ? (
                       <TouchableOpacity
                         style={styles.sheetItem}
@@ -840,6 +916,20 @@ const makeStyles = (colors: ThemeColors) =>
     justifyContent: "center",
     marginRight: 4,
   },
+  quoteBlock: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+    paddingLeft: 8,
+    paddingVertical: 3,
+    marginBottom: 5,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderTopRightRadius: 6,
+    borderBottomRightRadius: 6,
+  },
+  quoteBlockMine: { borderLeftColor: "rgba(21,23,28,0.55)" },
+  quoteSender: { fontSize: 12, fontWeight: "700", color: colors.primaryDark },
+  quoteText: { fontSize: 13, color: colors.textMuted },
+  quoteTextMine: { color: "rgba(21,23,28,0.65)" },
   reactChips: { flexDirection: "row", flexWrap: "wrap", marginTop: 6, gap: 4 },
   reactChip: {
     backgroundColor: "rgba(0,0,0,0.08)",

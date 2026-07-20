@@ -25,6 +25,7 @@ export type Message = {
   createdAt: string;
   editedAt?: string | null;
   reactions?: Reaction[];
+  replyTo?: number | null;
 };
 
 export type Conversation = {

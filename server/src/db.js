@@ -115,6 +115,9 @@ const msgCols = db.prepare("PRAGMA table_info(messages)").all();
 if (!msgCols.some((c) => c.name === "edited_at")) {
   db.exec("ALTER TABLE messages ADD COLUMN edited_at TEXT");
 }
+if (!msgCols.some((c) => c.name === "reply_to")) {
+  db.exec("ALTER TABLE messages ADD COLUMN reply_to INTEGER");
+}
 const userCols = db.prepare("PRAGMA table_info(users)").all();
 if (!userCols.some((c) => c.name === "public_key")) {
   db.exec("ALTER TABLE users ADD COLUMN public_key TEXT");
