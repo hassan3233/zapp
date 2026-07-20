@@ -10,11 +10,9 @@ import {
   Pressable,
   TouchableOpacity,
   StyleSheet,
-  KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHeaderHeight } from "@react-navigation/elements";
 import { api } from "../api";
 import { getSocket } from "../socket";
 import { useAuth } from "../auth/AuthContext";
@@ -62,17 +60,25 @@ export default function ChatScreen({ route, navigation }: any) {
   const { isOnline, lastSeen } = usePresence();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  // Header + status-bar height — the exact offset KeyboardAvoidingView needs so
-  // the composer sits right on top of the keyboard (edge-to-edge defeats the
-  // manifest's adjustResize on RN 0.85, so we lift it in JS).
-  const headerHeight = useHeaderHeight();
   // Keep the composer above the system navigation bar when the keyboard is
   // closed; sit snug on the keyboard when it's open.
   const insets = useSafeAreaInsets();
   const [kbVisible, setKbVisible] = useState(false);
+  // Actual keyboard height reported by the OS — we lift the composer by exactly
+  // this, which is device-agnostic (no header/inset math to get wrong).
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => setKbVisible(true));
-    const hide = Keyboard.addListener("keyboardDidHide", () => setKbVisible(false));
+    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvt, (e) => {
+      setKbVisible(true);
+      setKeyboardHeight(e.endCoordinates?.height ?? 0);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
+    });
+    const hide = Keyboard.addListener(hideEvt, () => {
+      setKbVisible(false);
+      setKeyboardHeight(0);
+    });
     return () => {
       show.remove();
       hide.remove();
@@ -537,11 +543,7 @@ export default function ChatScreen({ route, navigation }: any) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={headerHeight}
-    >
+    <View style={[styles.container, { paddingBottom: keyboardHeight }]}>
       {encActive ? (
         <View style={styles.e2eeBanner}>
           <Text style={styles.e2eeText}>🔒 {t("chat.e2ee")}</Text>
@@ -960,7 +962,7 @@ export default function ChatScreen({ route, navigation }: any) {
           </Pressable>
         </Modal>
       ) : null}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
