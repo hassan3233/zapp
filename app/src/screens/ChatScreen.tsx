@@ -47,7 +47,7 @@ import {
 import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import type { Message, User } from "../types";
+import type { Conversation, Message, User } from "../types";
 
 // Keep raw media small enough that the encrypted+base64 body (~1.8x raw)
 // stays under the server's 8 MB socket limit.
@@ -375,6 +375,44 @@ export default function ChatScreen({ route, navigation }: any) {
     }
   }
 
+  // ---- Forwarding: re-encrypt the decrypted payload for the target chat ----
+  const [forwardPayload, setForwardPayload] = useState<string | null>(null);
+  const [forwardConvs, setForwardConvs] = useState<Conversation[]>([]);
+
+  async function openForward(payload: string) {
+    setForwardPayload(payload);
+    try {
+      const res = await api.listConversations();
+      setForwardConvs(res.conversations);
+    } catch {
+      setForwardConvs([]);
+    }
+  }
+
+  function forwardTitleFor(c: Conversation) {
+    if (c.title) return c.title;
+    const others = c.members.filter((m) => m.id !== user?.id);
+    return others.map((o) => o.displayName).join(", ") || "Conversation";
+  }
+
+  async function doForward(target: Conversation) {
+    const payload = forwardPayload;
+    setForwardPayload(null);
+    if (!payload) return;
+    try {
+      const mem = await api.conversationMembers(target.id);
+      const body =
+        (user?.id != null && encryptMessage(payload, mem.members, user.id)) || payload;
+      const socket = getSocket();
+      socket?.emit("message:send", { conversationId: target.id, body });
+      if (target.id !== conversationId) {
+        Alert.alert("Forwarded", `Sent to ${forwardTitleFor(target)}.`);
+      }
+    } catch (e: any) {
+      Alert.alert("Could not forward", e.message || "Something went wrong.");
+    }
+  }
+
   // Aggregate raw reactions into chips: emoji → count, marking my own.
   function aggregateReactions(m: Message) {
     const byEmoji = new Map<string, { count: number; mine: boolean }>();
@@ -624,6 +662,18 @@ export default function ChatScreen({ route, navigation }: any) {
                   menuFor.body !== "🔒 …";
                 return (
                   <>
+                    {menuFor.body !== "🔒 …" ? (
+                      <TouchableOpacity
+                        style={styles.sheetItem}
+                        onPress={() => {
+                          const payload = menuFor.body;
+                          setMenuFor(null);
+                          openForward(payload);
+                        }}
+                      >
+                        <Text style={styles.sheetItemText}>↪️ Forward</Text>
+                      </TouchableOpacity>
+                    ) : null}
                     {editable ? (
                       <TouchableOpacity
                         style={styles.sheetItem}
@@ -662,6 +712,35 @@ export default function ChatScreen({ route, navigation }: any) {
                   </>
                 );
               })()}
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+
+      {/* Forward picker: choose which chat receives the message. */}
+      {forwardPayload ? (
+        <Modal transparent animationType="fade" visible onRequestClose={() => setForwardPayload(null)}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setForwardPayload(null)}>
+            <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 10, 22), maxHeight: "60%" }]}>
+              <Text style={styles.sheetTitle}>Forward to…</Text>
+              <FlatList
+                data={forwardConvs}
+                keyExtractor={(c) => String(c.id)}
+                renderItem={({ item }) => {
+                  const name = forwardTitleFor(item);
+                  return (
+                    <TouchableOpacity style={styles.forwardRow} onPress={() => doForward(item)}>
+                      <View style={styles.forwardAvatar}>
+                        <Text style={styles.forwardAvatarText}>{name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <Text style={styles.sheetItemText}>{name}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
+                ListEmptyComponent={
+                  <Text style={{ color: colors.textMuted, paddingVertical: 16 }}>No chats yet.</Text>
+                }
+              />
             </Pressable>
           </Pressable>
         </Modal>
@@ -800,6 +879,24 @@ const makeStyles = (colors: ThemeColors) =>
   },
   sheetItem: { paddingVertical: 13, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   sheetItemText: { color: colors.text, fontSize: 16, fontWeight: "600" },
+  sheetTitle: { color: colors.text, fontSize: 17, fontWeight: "800", marginBottom: 10 },
+  forwardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  forwardAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primaryDark,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  forwardAvatarText: { color: colors.onPrimary, fontSize: 17, fontWeight: "800" },
   editBar: {
     flexDirection: "row",
     alignItems: "center",
