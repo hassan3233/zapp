@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Zapp Chat palette — dark with an electric-yellow energy accent.
+// Zappchat palette — dark with an electric-yellow energy accent.
 export const darkColors = {
   bg: "#0E0F13",
   surface: "#15171C",

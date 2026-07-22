@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Zapp Chat",
+    "name": "Zappchat",
     "slug": "app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -28,13 +28,13 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Zapp Chat uses your location only to pick the right country code for your phone number."
+          "locationAlwaysAndWhenInUsePermission": "Zappchat uses your location only to pick the right country code for your phone number."
         }
       ],
       [
         "expo-contacts",
         {
-          "contactsPermission": "Zapp Chat uses your contacts to help you find friends who are already on the app."
+          "contactsPermission": "Zappchat uses your contacts to help you find friends who are already on the app."
         }
       ],
       "@react-native-firebase/app",

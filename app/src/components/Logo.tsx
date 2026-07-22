@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { View, Text, Image, StyleSheet } from "react-native";
 import { useTheme, type ThemeColors } from "../theme";
 
-// The bolt-in-bubble mark, optionally with the "Zapp Chat" wordmark.
+// The bolt-in-bubble mark, optionally with the "Zappchat" wordmark.
 export default function Logo({
   size = 96,
   showWordmark = true,
@@ -22,7 +22,7 @@ export default function Logo({
       />
       {showWordmark ? (
         <Text style={[styles.wordmark, { fontSize: wordmarkSize }]}>
-          Zapp <Text style={styles.chat}>Chat</Text>
+          Zapp<Text style={styles.chat}>chat</Text>
         </Text>
       ) : null}
     </View>
