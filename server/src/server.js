@@ -40,8 +40,8 @@ h1{color:#15171C}a{color:#E6B800}.bolt{color:#FFD11E}.muted{color:#6B7280;font-s
 app.get("/", (_req, res) =>
   res.type("html").send(
     PAGE(
-      "Zapp Chat",
-      `<h1>⚡ Zapp <span class="bolt">Chat</span></h1>
+      "Zappchat",
+      `<h1>⚡ Zapp<span class="bolt">chat</span></h1>
       <p>Chat. Call. Connect. A private messaging app with end-to-end encrypted chats and calls.</p>
       <p><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></p>`
     )
@@ -51,10 +51,10 @@ app.get("/", (_req, res) =>
 app.get("/privacy", (_req, res) =>
   res.type("html").send(
     PAGE(
-      "Zapp Chat — Privacy Policy",
+      "Zappchat — Privacy Policy",
       `<h1>Privacy Policy</h1>
       <p><em>Last updated: 2026</em></p>
-      <p>Zapp Chat ("the app") respects your privacy. This policy explains what we collect and why.</p>
+      <p>Zappchat ("the app") respects your privacy. This policy explains what we collect and why.</p>
       <h3>Information we collect</h3>
       <ul>
         <li><b>Phone number</b> — used to create your account and verify you (via Firebase Authentication).</li>
@@ -75,9 +75,9 @@ app.get("/privacy", (_req, res) =>
 app.get("/terms", (_req, res) =>
   res.type("html").send(
     PAGE(
-      "Zapp Chat — Terms of Service",
+      "Zappchat — Terms of Service",
       `<h1>Terms of Service</h1>
-      <p>By using Zapp Chat you agree to use it lawfully and not to abuse, spam, or harm other users.
+      <p>By using Zappchat you agree to use it lawfully and not to abuse, spam, or harm other users.
       The service is provided "as is" without warranty. We may suspend accounts that violate these terms.</p>`
     )
   )

@@ -3,7 +3,7 @@
 // localStorage, sent as the x-admin-key header).
 export const ADMIN_PAGE = `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Zapp Admin</title><style>
+<title>Zappchat Admin</title><style>
 :root{--bg:#0F1115;--surface:#181B22;--border:#262B35;--text:#F2F3F5;--muted:#8A919E;--yellow:#FFD11E;--danger:#FF5A5F;--green:#2ecc71}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
 .wrap{max-width:1080px;margin:0 auto;padding:24px 16px}
@@ -40,7 +40,7 @@ tr:last-child td{border-bottom:0}
 
 <div id="login">
   <div class="logo">⚡</div>
-  <h2>Zapp <span style="color:var(--yellow)">Admin</span></h2>
+  <h2>Zappchat <span style="color:var(--yellow)">Admin</span></h2>
   <input id="key" type="password" placeholder="Admin key" autocomplete="current-password">
   <button class="btn-y" onclick="login()">Sign in</button>
   <div class="err" id="loginErr"></div>
@@ -48,7 +48,7 @@ tr:last-child td{border-bottom:0}
 
 <div class="wrap" id="panel" style="display:none">
   <div class="top">
-    <h1>⚡ Zapp <span class="bolt">Admin</span></h1>
+    <h1>⚡ Zappchat <span class="bolt">Admin</span></h1>
     <button class="btn-ghost" onclick="logout()">Log out</button>
   </div>
   <div class="tabs">
