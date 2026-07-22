@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  ActivityIndicator,
   Image,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -37,6 +38,9 @@ export default function ConversationsScreen({ navigation }: any) {
   const { isOnline } = usePresence();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  // Until the first successful load we show a spinner (not an empty state),
+  // so a slow/cold-start fetch never looks like "you have no chats".
+  const [loaded, setLoaded] = useState(false);
   const [, setKeysReady] = useState(false);
 
   // ---- Message search (client-side: messages are E2EE, so we decrypt and
@@ -68,14 +72,17 @@ export default function ConversationsScreen({ navigation }: any) {
     return (c.lastMessage.senderId === user?.id ? t("conv.you") : "") + body;
   }
 
-  const load = useCallback(async () => {
+  // Load the list; on failure (cold start / transient network) retry a few
+  // times so the chats never silently disappear on app launch.
+  const load = useCallback(async (retries = 4) => {
     try {
       const res = await api.listConversations();
       setConversations(res.conversations);
+      setLoaded(true);
       // New messages may exist — refetch on the next search.
       msgCache.current.clear();
     } catch {
-      // ignore; pull-to-refresh will retry
+      if (retries > 0) setTimeout(() => load(retries - 1), 1200);
     }
   }, []);
 
@@ -91,13 +98,19 @@ export default function ConversationsScreen({ navigation }: any) {
     const socket = getSocket();
     if (!socket) return;
     const onNew = (_msg: Message) => load();
+    // When the socket (re)connects the network is up — reload in case the
+    // initial fetch on launch raced ahead of connectivity.
+    const onConnect = () => load();
     socket.on("message:new", onNew);
     socket.on("message:deleted", onNew);
     socket.on("message:edited", onNew);
+    socket.on("connect", onConnect);
+    if (socket.connected) load();
     return () => {
       socket.off("message:new", onNew);
       socket.off("message:deleted", onNew);
       socket.off("message:edited", onNew);
+      socket.off("connect", onConnect);
     };
   }, [load]);
 
@@ -282,10 +295,16 @@ export default function ConversationsScreen({ navigation }: any) {
           />
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>{t("conv.empty")}</Text>
-            <Text style={styles.emptySub}>{t("conv.emptySub")}</Text>
-          </View>
+          !loaded ? (
+            <View style={styles.empty}>
+              <ActivityIndicator color={colors.primary} size="large" />
+            </View>
+          ) : (
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>{t("conv.empty")}</Text>
+              <Text style={styles.emptySub}>{t("conv.emptySub")}</Text>
+            </View>
+          )
         }
         renderItem={({ item }) => {
           const name = titleFor(item);
