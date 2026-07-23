@@ -105,6 +105,8 @@ export const LANGUAGES: Language[] = [
   { code: "la", name: "Latin", native: "Latina" },
 ];
 
+// The language's own native name (e.g. "العربية", "فارسی", "English") — shown in
+// the Settings row so it reads naturally in whatever language is selected.
 export function languageName(code: string): string {
-  return LANGUAGES.find((l) => l.code === code)?.name || "English";
+  return LANGUAGES.find((l) => l.code === code)?.native || "English";
 }

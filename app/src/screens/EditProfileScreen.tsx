@@ -14,6 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme, type ThemeColors } from "../theme";
+import { useT } from "../i18n/i18n";
 import type { Gender } from "../types";
 
 // Parse "yyyy-mm-dd" as a LOCAL date (avoids the UTC off-by-one from new Date(str)).
@@ -27,6 +28,7 @@ function parseLocalDate(s?: string | null): Date | null {
 export default function EditProfileScreen({ navigation }: any) {
   const { user, updateProfile } = useAuth();
   const colors = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
@@ -63,7 +65,7 @@ export default function EditProfileScreen({ navigation }: any) {
   async function onSave() {
     setError(null);
     if (!firstName.trim()) {
-      setError("First name is required.");
+      setError(t("err.firstNameRequired"));
       return;
     }
     setBusy(true);
@@ -79,7 +81,7 @@ export default function EditProfileScreen({ navigation }: any) {
       });
       navigation.goBack();
     } catch (e: any) {
-      setError(e.message || "Could not save");
+      setError(e.message || t("err.saveFailed"));
     } finally {
       setBusy(false);
     }
@@ -95,37 +97,37 @@ export default function EditProfileScreen({ navigation }: any) {
             <Text style={styles.avatarPlus}>＋</Text>
           </View>
         )}
-        <Text style={styles.avatarLabel}>Change photo</Text>
+        <Text style={styles.avatarLabel}>{t("profile.changePhoto")}</Text>
       </TouchableOpacity>
 
-      <Text style={styles.label}>First name</Text>
+      <Text style={styles.label}>{t("field.firstName")}</Text>
       <TextInput style={styles.input} value={firstName} onChangeText={setFirstName}
-        placeholder="First name" placeholderTextColor={colors.textMuted} />
+        placeholder={t("field.firstName")} placeholderTextColor={colors.textMuted} />
 
-      <Text style={styles.label}>Last name</Text>
+      <Text style={styles.label}>{t("field.lastName")}</Text>
       <TextInput style={styles.input} value={lastName} onChangeText={setLastName}
-        placeholder="Last name" placeholderTextColor={colors.textMuted} />
+        placeholder={t("field.lastName")} placeholderTextColor={colors.textMuted} />
 
-      <Text style={styles.label}>Bio</Text>
+      <Text style={styles.label}>{t("field.bio")}</Text>
       <TextInput
         style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
         value={bio}
         onChangeText={setBio}
-        placeholder="Tell people a little about yourself"
+        placeholder={t("field.bioHint")}
         placeholderTextColor={colors.textMuted}
         multiline
         maxLength={300}
       />
 
-      <Text style={styles.label}>Email</Text>
+      <Text style={styles.label}>{t("field.email")}</Text>
       <TextInput style={styles.input} value={email} onChangeText={setEmail}
         placeholder="you@example.com" placeholderTextColor={colors.textMuted}
         keyboardType="email-address" autoCapitalize="none" />
 
-      <Text style={styles.label}>Date of birth</Text>
+      <Text style={styles.label}>{t("field.dob")}</Text>
       <TouchableOpacity style={styles.input} onPress={() => setShowDate(true)}>
         <Text style={{ color: dob ? colors.text : colors.textMuted, fontSize: 16 }}>
-          {dob ? fmtDate(dob) : "Select date"}
+          {dob ? fmtDate(dob) : t("field.selectDate")}
         </Text>
       </TouchableOpacity>
       {showDate && (
@@ -141,7 +143,7 @@ export default function EditProfileScreen({ navigation }: any) {
         />
       )}
 
-      <Text style={styles.label}>Gender</Text>
+      <Text style={styles.label}>{t("field.gender")}</Text>
       <View style={styles.genderRow}>
         {(["male", "female"] as Gender[]).map((g) => (
           <TouchableOpacity
@@ -150,7 +152,7 @@ export default function EditProfileScreen({ navigation }: any) {
             onPress={() => setGender(g)}
           >
             <Text style={[styles.genderText, gender === g && styles.genderTextActive]}>
-              {g === "male" ? "♂  Male" : "♀  Female"}
+              {g === "male" ? `♂  ${t("gender.male")}` : `♀  ${t("gender.female")}`}
             </Text>
           </TouchableOpacity>
         ))}
@@ -159,7 +161,7 @@ export default function EditProfileScreen({ navigation }: any) {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <TouchableOpacity style={[styles.button, busy && { opacity: 0.6 }]} onPress={onSave} disabled={busy}>
-        {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Save</Text>}
+        {busy ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>{t("common.save")}</Text>}
       </TouchableOpacity>
     </ScrollView>
   );

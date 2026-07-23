@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { api } from "../api";
 import { useTheme, type ThemeColors } from "../theme";
+import { useT } from "../i18n/i18n";
 import type { User } from "../types";
 
 // Full profile of a chat partner: photo, name, phone, bio, date of birth,
@@ -18,6 +19,7 @@ import type { User } from "../types";
 export default function ContactProfileScreen({ route, navigation }: any) {
   const initial: User = route.params.user;
   const colors = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [user, setUser] = useState<User>(initial);
   const [blocked, setBlocked] = useState(false);
@@ -57,22 +59,22 @@ export default function ContactProfileScreen({ route, navigation }: any) {
       api
         .unblockUser(user.id)
         .then(() => setBlocked(false))
-        .catch((e) => Alert.alert("Error", e.message || "Could not unblock"));
+        .catch((e) => Alert.alert(t("common.error"), e.message || t("contact.couldNotUnblock")));
       return;
     }
     Alert.alert(
-      `Block ${user.displayName}?`,
-      "They will no longer be able to message or call you.",
+      t("contact.blockTitle", { name: user.displayName }),
+      t("contact.blockBody"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Block",
+          text: t("contact.block"),
           style: "destructive",
           onPress: () =>
             api
               .blockUser(user.id)
               .then(() => setBlocked(true))
-              .catch((e) => Alert.alert("Error", e.message || "Could not block")),
+              .catch((e) => Alert.alert(t("common.error"), e.message || t("contact.couldNotBlock"))),
         },
       ]
     );
@@ -81,18 +83,18 @@ export default function ContactProfileScreen({ route, navigation }: any) {
   function doReport() {
     setMenuOpen(false);
     Alert.alert(
-      `Report ${user.displayName}?`,
-      "This account will be reported for abuse.",
+      t("contact.reportTitle", { name: user.displayName }),
+      t("contact.reportBody"),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Report",
+          text: t("contact.report"),
           style: "destructive",
           onPress: () =>
             api
               .reportUser(user.id)
-              .then(() => Alert.alert("Thank you", "The report was submitted."))
-              .catch((e) => Alert.alert("Error", e.message || "Could not report")),
+              .then(() => Alert.alert(t("contact.thankYou"), t("contact.reportSubmitted")))
+              .catch((e) => Alert.alert(t("common.error"), e.message || t("contact.couldNotReport"))),
         },
       ]
     );
@@ -110,12 +112,12 @@ export default function ContactProfileScreen({ route, navigation }: any) {
         </View>
       )}
       <Text style={styles.name}>{user.displayName}</Text>
-      {blocked ? <Text style={styles.blockedBadge}>⛔ Blocked</Text> : null}
+      {blocked ? <Text style={styles.blockedBadge}>{`⛔ ${t("contact.blocked")}`}</Text> : null}
 
       <View style={styles.card}>
-        <InfoRow styles={styles} label="Phone" value={user.phone} />
-        <InfoRow styles={styles} label="Bio" value={user.bio || "—"} />
-        <InfoRow styles={styles} label="Date of birth" value={user.dateOfBirth || "—"} last />
+        <InfoRow styles={styles} label={t("field.phone")} value={user.phone} />
+        <InfoRow styles={styles} label={t("field.bio")} value={user.bio || "—"} />
+        <InfoRow styles={styles} label={t("field.dob")} value={user.dateOfBirth || "—"} last />
       </View>
 
       {/* ⋮ dropdown */}
@@ -123,11 +125,11 @@ export default function ContactProfileScreen({ route, navigation }: any) {
         <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={() => setMenuOpen(false)}>
           <View style={styles.menu}>
             <TouchableOpacity style={styles.menuItem} onPress={doReport}>
-              <Text style={[styles.menuText, { color: colors.danger }]}>Report</Text>
+              <Text style={[styles.menuText, { color: colors.danger }]}>{t("contact.report")}</Text>
             </TouchableOpacity>
             <View style={styles.menuDivider} />
             <TouchableOpacity style={styles.menuItem} onPress={doBlockToggle}>
-              <Text style={styles.menuText}>{blocked ? "Unblock" : "Block"}</Text>
+              <Text style={styles.menuText}>{blocked ? t("contact.unblock") : t("contact.block")}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

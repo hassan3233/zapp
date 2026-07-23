@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Switch } from "react-native";
 import { getChatPrefs, setChatPrefs, ChatPrefs } from "../settings/prefs";
 import { useTheme, type ThemeColors } from "../theme";
+import { useT } from "../i18n/i18n";
 
 export default function ChatsSettingsScreen() {
   const colors = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [prefs, setPrefs] = useState<ChatPrefs>({
     enterIsSend: true,
@@ -24,28 +26,28 @@ export default function ChatsSettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.section}>Messaging</Text>
+      <Text style={styles.section}>{t("chatset.messaging")}</Text>
       <View style={styles.card}>
         <ToggleRow
-          label="Enter is send"
-          desc="Pressing Enter sends the message"
+          label={t("chatset.enterSend")}
+          desc={t("chatset.enterSendDesc")}
           value={prefs.enterIsSend}
           onChange={(v) => update({ enterIsSend: v })}
         />
         <ToggleRow
-          label="Read receipts"
-          desc="Others see when you've read messages"
+          label={t("chatset.readReceipts")}
+          desc={t("chatset.readReceiptsDesc")}
           value={prefs.readReceipts}
           onChange={(v) => update({ readReceipts: v })}
           last
         />
       </View>
 
-      <Text style={styles.section}>Media</Text>
+      <Text style={styles.section}>{t("common.media")}</Text>
       <View style={styles.card}>
         <ToggleRow
-          label="Auto-download media"
-          desc="Photos download automatically"
+          label={t("chatset.autoDownloadLabel")}
+          desc={t("chatset.autoDownloadDesc")}
           value={prefs.mediaAutoDownload}
           onChange={(v) => update({ mediaAutoDownload: v })}
           last

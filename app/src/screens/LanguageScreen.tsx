@@ -64,7 +64,7 @@ export default function LanguageScreen({ navigation }: any) {
         renderItem={({ item }) => {
           const isSel = item.code === lang;
           return (
-            <TouchableOpacity style={styles.row} onPress={() => choose(item.code, item.name)}>
+            <TouchableOpacity style={styles.row} onPress={() => choose(item.code, item.native)}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
                 <Text style={styles.native}>{item.native}</Text>

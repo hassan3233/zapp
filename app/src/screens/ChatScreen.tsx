@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../api";
@@ -72,7 +73,19 @@ export default function ChatScreen({ route, navigation }: any) {
     const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
     const show = Keyboard.addListener(showEvt, (e) => {
       setKbVisible(true);
-      setKeyboardHeight(e.endCoordinates?.height ?? 0);
+      // Lift the composer by the gap between the screen bottom and the TOP of
+      // the keyboard (screenY), not just the keyboard's height. Under
+      // edge-to-edge these differ in 3-button nav: the keyboard sits ABOVE the
+      // navigation bar, so height alone leaves the composer hidden behind the
+      // keyboard by the nav-bar height. screenY-based lift is correct for both
+      // gesture nav (keyboard reaches the screen bottom) and 3-button nav.
+      const end = e.endCoordinates;
+      const screenH = Dimensions.get("screen").height;
+      const lift =
+        end && end.screenY > 0
+          ? Math.max(screenH - end.screenY, end.height ?? 0)
+          : end?.height ?? 0;
+      setKeyboardHeight(lift);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
     });
     const hide = Keyboard.addListener(hideEvt, () => {
@@ -558,7 +571,7 @@ export default function ChatScreen({ route, navigation }: any) {
         >
           <Text style={{ fontSize: 15, marginRight: 8 }}>📌</Text>
           <View style={{ flex: 1 }}>
-            <Text style={styles.pinnedTitle}>Pinned message</Text>
+            <Text style={styles.pinnedTitle}>{t("chat.pinned")}</Text>
             <Text style={styles.pinnedText} numberOfLines={1}>
               {quotedLabel(pinned).text}
             </Text>
@@ -714,7 +727,7 @@ export default function ChatScreen({ route, navigation }: any) {
       <View
         style={[
           styles.composer,
-          { paddingBottom: kbVisible || attachOpen ? 8 : Math.max(insets.bottom + 8, 20) },
+          { paddingBottom: kbVisible || attachOpen ? 8 : Math.max(insets.bottom, 10) },
         ]}
       >
         <TouchableOpacity onPress={() => setAttachOpen((o) => !o)} style={styles.attachBtn}>
@@ -757,20 +770,20 @@ export default function ChatScreen({ route, navigation }: any) {
         <View
           style={[
             styles.attachPanel,
-            { paddingBottom: kbVisible ? 10 : Math.max(insets.bottom + 10, 22) },
+            { paddingBottom: kbVisible ? 10 : Math.max(insets.bottom, 12) },
           ]}
         >
           <TouchableOpacity style={styles.attachOption} onPress={takePhoto}>
             <View style={styles.attachCircle}>
               <Text style={{ fontSize: 26 }}>📷</Text>
             </View>
-            <Text style={styles.attachLabel}>Camera</Text>
+            <Text style={styles.attachLabel}>{t("attach.camera")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.attachOption} onPress={pickFromGallery}>
             <View style={styles.attachCircle}>
               <Text style={{ fontSize: 26 }}>🖼</Text>
             </View>
-            <Text style={styles.attachLabel}>Gallery</Text>
+            <Text style={styles.attachLabel}>{t("attach.gallery")}</Text>
           </TouchableOpacity>
         </View>
       ) : null}
@@ -900,7 +913,7 @@ export default function ChatScreen({ route, navigation }: any) {
         <Modal transparent animationType="fade" visible onRequestClose={() => setForwardPayload(null)}>
           <Pressable style={styles.sheetBackdrop} onPress={() => setForwardPayload(null)}>
             <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 10, 22), maxHeight: "60%" }]}>
-              <Text style={styles.sheetTitle}>Forward to…</Text>
+              <Text style={styles.sheetTitle}>{t("chat.forwardTo")}</Text>
               <FlatList
                 data={forwardConvs}
                 keyExtractor={(c) => String(c.id)}
@@ -916,7 +929,7 @@ export default function ChatScreen({ route, navigation }: any) {
                   );
                 }}
                 ListEmptyComponent={
-                  <Text style={{ color: colors.textMuted, paddingVertical: 16 }}>No chats yet.</Text>
+                  <Text style={{ color: colors.textMuted, paddingVertical: 16 }}>{t("chat.noChats")}</Text>
                 }
               />
             </Pressable>

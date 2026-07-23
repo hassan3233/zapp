@@ -2,10 +2,12 @@ import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
 import { useAuth } from "../auth/AuthContext";
 import { useTheme, type ThemeColors } from "../theme";
+import { useT } from "../i18n/i18n";
 
 export default function AccountScreen() {
   const { user, logout } = useAuth();
   const colors = useTheme();
+  const { t } = useT();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   if (!user) return null;
 
@@ -13,29 +15,29 @@ export default function AccountScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.section}>Account info</Text>
+      <Text style={styles.section}>{t("account.info")}</Text>
       <View style={styles.card}>
-        <Row label="Phone number" value={user.phone} />
-        <Row label="Name" value={user.displayName} />
-        <Row label="Member since" value={memberSince} last />
+        <Row label={t("account.phoneNumber")} value={user.phone} />
+        <Row label={t("field.name")} value={user.displayName} />
+        <Row label={t("account.memberSince")} value={memberSince} last />
       </View>
 
-      <Text style={styles.section}>Security</Text>
+      <Text style={styles.section}>{t("account.security")}</Text>
       <View style={styles.card}>
-        <RowAction label="Two-step verification" hint="Off" onPress={() => Alert.alert("Two-step verification", "Coming soon.")} />
-        <RowAction label="Blocked contacts" hint="0" onPress={() => Alert.alert("Blocked contacts", "No blocked contacts.")} last />
+        <RowAction label={t("account.twoStep")} hint={t("common.off")} onPress={() => Alert.alert(t("account.twoStep"), t("common.comingSoon"))} />
+        <RowAction label={t("account.blockedContacts")} hint="0" onPress={() => Alert.alert(t("account.blockedContacts"), t("account.noBlocked"))} last />
       </View>
 
       <TouchableOpacity
         style={[styles.card, styles.danger]}
         onPress={() =>
-          Alert.alert("Delete account", "This will permanently delete your account.", [
-            { text: "Cancel", style: "cancel" },
-            { text: "Delete", style: "destructive", onPress: logout },
+          Alert.alert(t("account.deleteTitle"), t("account.deleteBody"), [
+            { text: t("common.cancel"), style: "cancel" },
+            { text: t("common.delete"), style: "destructive", onPress: logout },
           ])
         }
       >
-        <Text style={styles.dangerText}>Delete my account</Text>
+        <Text style={styles.dangerText}>{t("account.deleteMy")}</Text>
       </TouchableOpacity>
     </ScrollView>
   );

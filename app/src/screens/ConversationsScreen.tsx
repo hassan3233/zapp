@@ -223,7 +223,7 @@ export default function ConversationsScreen({ navigation }: any) {
           style={styles.searchInput}
           value={query}
           onChangeText={setQuery}
-          placeholder="Search messages"
+          placeholder={t("search.messages")}
           placeholderTextColor={colors.textMuted}
           autoCorrect={false}
           returnKeyType="search"

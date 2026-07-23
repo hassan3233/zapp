@@ -1,0 +1,16 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+  <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+    <item name="colorPrimary">@color/colorPrimary</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <!-- Don't let the OS paint a translucent "contrast" scrim behind the
+         transparent system bars. On Samsung One UI (3-button nav) that scrim
+         showed up as a second grey band under the chat composer. -->
+    <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
+    <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
+  </style>
+  <style name="Theme.App.SplashScreen" parent="AppTheme">
+    <item name="android:windowBackground">@drawable/splashscreen_logo</item>
+  </style>
+</resources>

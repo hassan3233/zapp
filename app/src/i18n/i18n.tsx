@@ -54,8 +54,30 @@ export function detectDeviceRegion(): string | null {
 // when the direction actually flips we re-run the app from scratch; on relaunch
 // the saved language is read back and both the strings and the layout match.
 function reloadApp() {
+  // In development a fast JS reload flips the layout and keeps Metro attached.
+  if (__DEV__) {
+    try {
+      DevSettings.reload();
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
+  // Release builds: our own native module fully restarts the process, which is
+  // what actually makes I18nManager's RTL flag take effect.
   try {
-    // Present in production builds that include expo-updates.
+    const AppRestart = NativeModules?.AppRestart as
+      | { restart?: () => void }
+      | undefined;
+    if (AppRestart?.restart) {
+      AppRestart.restart();
+      return;
+    }
+  } catch {
+    /* not present — fall through */
+  }
+  try {
+    // Present in builds that include expo-updates.
     const Updates = require("expo-updates");
     if (Updates?.reloadAsync) {
       Updates.reloadAsync();
