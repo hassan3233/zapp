@@ -12,6 +12,7 @@ import {
   getPushTokensForUsers,
   deletePushToken,
   isBlockedEither,
+  getPendingIncomingCall,
 } from "./store.js";
 import { sendPush } from "./firebase.js";
 
@@ -53,6 +54,37 @@ function notifyOfflineMembers(convId, senderId) {
   }
 }
 
+// Ring a callee who has no live socket (phone locked / app killed). Without
+// this the call:incoming emit goes to an empty room and the callee never finds
+// out anyone called. sendPush already uses android priority "high" + a
+// notification payload, so the device wakes and shows it on the lock screen.
+function notifyIncomingCall(call, from, calleeId) {
+  try {
+    if (onlineCounts.get(Number(calleeId))) return; // their socket rings them
+    const rows = getPushTokensForUsers([Number(calleeId)]);
+    if (!rows.length) return;
+    const name = from?.displayName || "Someone";
+    sendPush(
+      rows.map((r) => r.token),
+      {
+        title: name,
+        body: call.media === "video" ? "Incoming video call" : "Incoming call",
+        data: {
+          type: "call",
+          callId: String(call.id),
+          media: String(call.media),
+          fromId: String(call.callerId),
+          fromName: name,
+        },
+      }
+    )
+      .then(({ invalidTokens }) => invalidTokens.forEach(deletePushToken))
+      .catch((e) => console.error("[push] call send failed:", e?.message));
+  } catch (e) {
+    console.error("[push] call notify failed:", e?.message);
+  }
+}
+
 export function registerSockets(io) {
   // Authenticate every socket connection using the JWT from the handshake.
   io.use((socket, next) => {
@@ -84,6 +116,24 @@ export function registerSockets(io) {
       online: [...onlineCounts.keys()],
       lastSeen: Object.fromEntries(lastSeenMap),
     });
+
+    // If someone is ringing this user right now, replay the invite. Their phone
+    // was probably locked when the call started (socket gone, so the original
+    // call:incoming went nowhere) and the push just woke the app — without this
+    // they'd see the notification but land in an app that knows nothing about
+    // the call.
+    try {
+      const pending = getPendingIncomingCall(uid);
+      if (pending) {
+        socket.emit("call:incoming", {
+          callId: pending.id,
+          media: pending.media,
+          from: publicUser(getUserById(pending.callerId)),
+        });
+      }
+    } catch (e) {
+      console.error("[calls] pending replay failed:", e?.message);
+    }
 
     socket.on("disconnect", () => {
       const n = (onlineCounts.get(uid) || 1) - 1;
@@ -176,11 +226,14 @@ export function registerSockets(io) {
         calleeId: Number(toUserId),
         media: media === "video" ? "video" : "audio",
       });
+      const from = publicUser(getUserById(socket.user.id));
       io.to(toUser(toUserId)).emit("call:incoming", {
         callId: call.id,
         media: call.media,
-        from: publicUser(getUserById(socket.user.id)),
+        from,
       });
+      // If their phone is locked the socket above is gone, so also push.
+      notifyIncomingCall(call, from, toUserId);
       if (typeof ack === "function") ack({ ok: true, callId: call.id });
     });
 

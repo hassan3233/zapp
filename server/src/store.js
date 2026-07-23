@@ -572,6 +572,22 @@ export function getCallById(id) {
   return c ? serializeCall(c) : null;
 }
 
+// The call that is still ringing for this user: created moments ago and never
+// finished. Lets us re-ring a callee whose socket had dropped (locked phone) —
+// the push wakes the app, and on reconnect we replay the invite so they can
+// still answer instead of the call silently never arriving.
+export function getPendingIncomingCall(calleeId, withinSec = 60) {
+  const c = db
+    .prepare(
+      `SELECT * FROM calls
+        WHERE callee_id = ? AND ended_at IS NULL
+          AND started_at > datetime('now', ?)
+        ORDER BY id DESC LIMIT 1`
+    )
+    .get(Number(calleeId), `-${Number(withinSec)} seconds`);
+  return c ? serializeCall(c) : null;
+}
+
 export function finishCall(id, status, durationSec) {
   db.prepare(
     "UPDATE calls SET status = ?, ended_at = datetime('now'), duration = ? WHERE id = ?"
