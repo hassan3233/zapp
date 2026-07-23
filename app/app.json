@@ -41,7 +41,8 @@
       "@react-native-firebase/auth",
       "@react-native-firebase/messaging",
       "expo-audio",
-      "expo-video"
+      "expo-video",
+      "./plugins/withZappchatNative"
     ]
   }
 }
