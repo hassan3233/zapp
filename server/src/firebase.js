@@ -20,6 +20,32 @@ export async function verifyFirebaseIdToken(idToken) {
   return getAuth().verifyIdToken(idToken);
 }
 
+// Data-only push: deliberately no `notification` payload, so Android does NOT
+// post anything itself and the app's background handler runs instead. That's
+// what lets the client build the full-screen ringing call notification.
+export async function sendDataPush(tokens, data) {
+  if (!tokens.length) return { invalidTokens: [] };
+  const res = await getMessaging().sendEachForMulticast({
+    tokens,
+    data: data || {},
+    // "high" wakes the device out of Doze; without it a locked phone may sit on
+    // the message until the next maintenance window and the call is long over.
+    android: { priority: "high" },
+  });
+  const invalidTokens = [];
+  res.responses.forEach((r, i) => {
+    const code = r.error?.code;
+    if (
+      code === "messaging/registration-token-not-registered" ||
+      code === "messaging/invalid-registration-token" ||
+      code === "messaging/invalid-argument"
+    ) {
+      invalidTokens.push(tokens[i]);
+    }
+  });
+  return { invalidTokens };
+}
+
 // Send a push notification to the given FCM device tokens. Returns the tokens
 // that are permanently invalid (unregistered) so the caller can prune them.
 export async function sendPush(tokens, { title, body, data }) {

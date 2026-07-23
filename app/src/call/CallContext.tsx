@@ -10,6 +10,7 @@ import { getSocket } from "../socket";
 import { useAuth } from "../auth/AuthContext";
 import type { CallMedia, User } from "../types";
 import { PeerSession, isWebRTCAvailable } from "./webrtc";
+import { dismissIncomingCall } from "../incomingCall";
 
 type CallPhase = "idle" | "outgoing" | "incoming" | "connected" | "ended";
 
@@ -59,6 +60,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }
 
   function cleanup() {
+    // The phone may be ringing off a full-screen push notification rather than
+    // the in-app UI — silence it however the call ended.
+    dismissIncomingCall();
     if (timer.current) clearInterval(timer.current);
     timer.current = null;
     answeredRef.current = false;
@@ -73,6 +77,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }
 
   function startTimer() {
+    dismissIncomingCall(); // answered — stop the ringtone
     answeredRef.current = true;
     setPhase("connected");
     if (timer.current) clearInterval(timer.current);

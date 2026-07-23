@@ -1,5 +1,6 @@
 import { NativeModules, PermissionsAndroid, Platform } from "react-native";
 import { api } from "./api";
+import { showIncomingCall, dismissIncomingCall } from "./incomingCall";
 
 // FCM messaging only exists in a real native build. Guard every use so the dev
 // client (where the module is absent) never crashes.
@@ -16,13 +17,24 @@ function messaging(): any {
 let currentToken: string | null = null;
 
 // Must be called once at module load (before the app renders) so notifications
-// that arrive while the app is killed/backgrounded are handled. We send a
-// `notification` payload, so Android displays it automatically — this handler
-// just needs to exist to avoid the "no background handler" warning.
+// that arrive while the app is killed/backgrounded are handled.
+//
+// Message pushes carry a `notification` payload, so Android displays those
+// itself and this handler has nothing to do. Call pushes are deliberately
+// data-only — that's what makes this handler run while the phone is locked, so
+// we can put up the full-screen ringing notification ourselves.
 export function setupBackgroundMessageHandler(): void {
   if (!messagingAvailable()) return;
   try {
-    messaging().setBackgroundMessageHandler(async () => {});
+    messaging().setBackgroundMessageHandler(async (msg: any) => {
+      const data = msg?.data || {};
+      if (data.type === "call") {
+        showIncomingCall(data.callId, data.fromName, data.media);
+      } else if (data.type === "call-canceled") {
+        // Caller gave up — stop ringing at a call that no longer exists.
+        dismissIncomingCall();
+      }
+    });
   } catch {
     /* ignore */
   }

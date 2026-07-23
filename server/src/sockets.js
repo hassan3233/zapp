@@ -14,7 +14,7 @@ import {
   isBlockedEither,
   getPendingIncomingCall,
 } from "./store.js";
-import { sendPush } from "./firebase.js";
+import { sendPush, sendDataPush } from "./firebase.js";
 
 // Presence: how many live sockets each user has, and when they were last seen.
 const onlineCounts = new Map(); // userId -> socket count
@@ -56,32 +56,43 @@ function notifyOfflineMembers(convId, senderId) {
 
 // Ring a callee who has no live socket (phone locked / app killed). Without
 // this the call:incoming emit goes to an empty room and the callee never finds
-// out anyone called. sendPush already uses android priority "high" + a
-// notification payload, so the device wakes and shows it on the lock screen.
+// out anyone called. Data-only + high priority so the app's background handler
+// wakes and puts up the full-screen ringing notification itself.
 function notifyIncomingCall(call, from, calleeId) {
   try {
     if (onlineCounts.get(Number(calleeId))) return; // their socket rings them
     const rows = getPushTokensForUsers([Number(calleeId)]);
     if (!rows.length) return;
     const name = from?.displayName || "Someone";
-    sendPush(
-      rows.map((r) => r.token),
-      {
-        title: name,
-        body: call.media === "video" ? "Incoming video call" : "Incoming call",
-        data: {
-          type: "call",
-          callId: String(call.id),
-          media: String(call.media),
-          fromId: String(call.callerId),
-          fromName: name,
-        },
-      }
-    )
+    sendDataPush(rows.map((r) => r.token), {
+      type: "call",
+      callId: String(call.id),
+      media: String(call.media),
+      fromId: String(call.callerId),
+      fromName: name,
+    })
       .then(({ invalidTokens }) => invalidTokens.forEach(deletePushToken))
       .catch((e) => console.error("[push] call send failed:", e?.message));
   } catch (e) {
     console.error("[push] call notify failed:", e?.message);
+  }
+}
+
+// Tell a ringing device to stop — the caller gave up (or the call ended)
+// before it was answered. Without this the phone keeps ringing at a call that
+// no longer exists.
+function notifyCallCanceled(calleeId, callId) {
+  try {
+    const rows = getPushTokensForUsers([Number(calleeId)]);
+    if (!rows.length) return;
+    sendDataPush(rows.map((r) => r.token), {
+      type: "call-canceled",
+      callId: String(callId),
+    })
+      .then(({ invalidTokens }) => invalidTokens.forEach(deletePushToken))
+      .catch(() => {});
+  } catch {
+    /* best effort */
   }
 }
 
@@ -249,11 +260,14 @@ export function registerSockets(io) {
     socket.on("call:cancel", ({ callId, toUserId } = {}) => {
       if (callId) finishCall(Number(callId), "canceled", 0);
       io.to(toUser(toUserId)).emit("call:canceled", { callId });
+      // Their phone may be ringing off a push rather than the socket.
+      notifyCallCanceled(toUserId, callId);
     });
 
     socket.on("call:end", ({ callId, toUserId, durationSec, answered } = {}) => {
       if (callId) finishCall(Number(callId), answered ? "ended" : "missed", durationSec || 0);
       io.to(toUser(toUserId)).emit("call:ended", { callId });
+      if (!answered) notifyCallCanceled(toUserId, callId);
     });
 
     // WebRTC signaling relay (offer / answer / ICE candidates).
