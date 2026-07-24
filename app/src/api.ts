@@ -1,5 +1,5 @@
 import { API_URL } from "./config";
-import type { Call, Conversation, Gender, Message, User } from "./types";
+import type { Call, Channel, Conversation, Gender, Message, User } from "./types";
 
 let authToken: string | null = null;
 
@@ -144,6 +144,30 @@ export const api = {
       "/api/conversations/group",
       { method: "POST", body: { title, memberIds } }
     ),
+
+  // ---- Channels (broadcast) ----
+  listChannels: (q?: string) =>
+    request<{ channels: Channel[] }>(
+      `/api/channels${q ? `?q=${encodeURIComponent(q)}` : ""}`
+    ),
+
+  createChannel: (title: string, description?: string) =>
+    request<{ channel: Channel }>("/api/channels", {
+      method: "POST",
+      body: { title, description },
+    }),
+
+  getChannel: (id: number) => request<{ channel: Channel }>(`/api/channels/${id}`),
+
+  subscribeChannel: (id: number) =>
+    request<{ ok: boolean; subscribed: boolean }>(`/api/channels/${id}/subscribe`, {
+      method: "POST",
+    }),
+
+  unsubscribeChannel: (id: number) =>
+    request<{ ok: boolean; subscribed: boolean }>(`/api/channels/${id}/subscribe`, {
+      method: "DELETE",
+    }),
 
   listCalls: () => request<{ calls: Call[] }>("/api/calls"),
 

@@ -29,9 +29,26 @@ export type Message = {
   starred?: boolean;
 };
 
+// A broadcast channel: everyone can subscribe and read, only the owner posts.
+// Channel posts are NOT end-to-end encrypted (a broadcast can't re-wrap the key
+// for every subscriber), so they're stored and shown as plain text.
+export type Channel = {
+  id: number;
+  title: string;
+  description: string | null;
+  ownerId: number;
+  subscribers: number;
+  subscribed?: boolean;
+  isOwner?: boolean;
+  createdAt?: string;
+};
+
 export type Conversation = {
   id: number;
   isGroup: boolean;
+  isChannel?: boolean;
+  ownerId?: number | null;
+  isOwner?: boolean;
   title: string | null;
   members: User[];
   lastMessage: {

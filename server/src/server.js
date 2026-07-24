@@ -9,6 +9,7 @@ import { startPersistence } from "./persistence.js";
 import authRoutes from "./routes/auth.js";
 import usersRoutes from "./routes/users.js";
 import conversationsRouter from "./routes/conversations.js";
+import channelsRouter from "./routes/channels.js";
 import callsRoutes from "./routes/calls.js";
 import adminRoutes from "./routes/admin.js";
 import { ADMIN_PAGE } from "./adminPage.js";
@@ -86,6 +87,7 @@ app.get("/terms", (_req, res) =>
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/conversations", conversationsRouter(io));
+app.use("/api/channels", channelsRouter());
 app.use("/api/calls", callsRoutes);
 
 // Admin panel (page + API). Gated by the ZAPP_ADMIN_KEY env var.

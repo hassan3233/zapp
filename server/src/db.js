@@ -130,6 +130,20 @@ const convCols = db.prepare("PRAGMA table_info(conversations)").all();
 if (!convCols.some((c) => c.name === "pinned_message_id")) {
   db.exec("ALTER TABLE conversations ADD COLUMN pinned_message_id INTEGER");
 }
+// Broadcast channels reuse conversations (and therefore messages, members and
+// the whole socket layer). Members are the subscribers; only owner_id may post.
+// NOTE: channel posts are NOT end-to-end encrypted — a broadcast would have to
+// re-wrap the key for every subscriber and new subscribers could never read the
+// history, so the body is stored as plain text here.
+if (!convCols.some((c) => c.name === "is_channel")) {
+  db.exec("ALTER TABLE conversations ADD COLUMN is_channel INTEGER NOT NULL DEFAULT 0");
+}
+if (!convCols.some((c) => c.name === "owner_id")) {
+  db.exec("ALTER TABLE conversations ADD COLUMN owner_id INTEGER");
+}
+if (!convCols.some((c) => c.name === "description")) {
+  db.exec("ALTER TABLE conversations ADD COLUMN description TEXT");
+}
 const userCols = db.prepare("PRAGMA table_info(users)").all();
 if (!userCols.some((c) => c.name === "public_key")) {
   db.exec("ALTER TABLE users ADD COLUMN public_key TEXT");

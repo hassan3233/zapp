@@ -55,6 +55,10 @@ const MAX_MEDIA_B64 = 5_000_000;
 export default function ChatScreen({ route, navigation }: any) {
   const { conversationId, title } = route.params;
   const peer: User | undefined = route.params?.peer;
+  // Broadcast channel: everyone reads, only the owner posts (and posts are not
+  // encrypted — see sendBody).
+  const isChannel: boolean = !!route.params?.isChannel;
+  const canPost: boolean = !isChannel || !!route.params?.isOwner;
   const { user } = useAuth();
   const { startCall } = useCall();
   const { t } = useT();
@@ -342,9 +346,13 @@ export default function ChatScreen({ route, navigation }: any) {
   }
 
   // Encrypt for all members (incl. me); fall back to plaintext if we can't.
+  // Channels are the exception: a broadcast would have to re-wrap the key for
+  // every subscriber and new subscribers could never read the backlog, so
+  // channel posts go out as plain text (see the banner in the header).
   function sendBody(raw: string, replyTo?: number) {
-    const body =
-      (user?.id != null && encryptMessage(raw, members, user.id)) || raw;
+    const body = isChannel
+      ? raw
+      : (user?.id != null && encryptMessage(raw, members, user.id)) || raw;
     const socket = getSocket();
     socket?.emit("message:send", { conversationId, body, replyTo });
     socket?.emit("typing", { conversationId, isTyping: false });
@@ -557,7 +565,13 @@ export default function ChatScreen({ route, navigation }: any) {
 
   return (
     <View style={[styles.container, { paddingBottom: keyboardHeight }]}>
-      {encActive ? (
+      {isChannel ? (
+        // Never claim E2EE here — channel posts really are readable by the
+        // server, so say so rather than showing the encryption banner.
+        <View style={styles.e2eeBanner}>
+          <Text style={styles.e2eeText}>📢 {t("channel.notEncrypted")}</Text>
+        </View>
+      ) : encActive ? (
         <View style={styles.e2eeBanner}>
           <Text style={styles.e2eeText}>🔒 {t("chat.e2ee")}</Text>
         </View>
@@ -691,7 +705,18 @@ export default function ChatScreen({ route, navigation }: any) {
 
       {peerTyping ? <Text style={styles.typing}>typing…</Text> : null}
 
-      {recordingVoice ? (
+      {!canPost ? (
+        // Subscribers read only — the server rejects their posts anyway, so
+        // don't offer a composer that can't work.
+        <View
+          style={[
+            styles.readOnlyBar,
+            { paddingBottom: Math.max(insets.bottom, 12) },
+          ]}
+        >
+          <Text style={styles.readOnlyText}>🔇 {t("channel.readOnly")}</Text>
+        </View>
+      ) : recordingVoice ? (
         <View style={{ paddingBottom: kbVisible ? 0 : Math.max(insets.bottom, 12), backgroundColor: colors.surface }}>
           <VoiceRecorderBar
             onCancel={() => setRecordingVoice(false)}
@@ -996,6 +1021,15 @@ function fmtSeen(iso: string) {
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  readOnlyBar: {
+    alignItems: "center",
+    paddingTop: 14,
+    paddingHorizontal: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  readOnlyText: { color: colors.textMuted, fontSize: 14 },
   e2eeBanner: {
     alignItems: "center",
     paddingVertical: 6,

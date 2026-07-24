@@ -20,6 +20,8 @@ import {
   getStarredMessages,
   setPinned,
   getPinnedMessage,
+  isChannel,
+  isChannelOwner,
 } from "../store.js";
 
 export default function conversationsRouter(io) {
@@ -220,6 +222,10 @@ export default function conversationsRouter(io) {
     const convId = Number(req.params.id);
     if (!isMember(convId, req.user.id)) {
       return res.status(403).json({ error: "not a member of this conversation" });
+    }
+    // Channels are broadcast-only: subscribers can read but not post.
+    if (isChannel(convId) && !isChannelOwner(convId, req.user.id)) {
+      return res.status(403).json({ error: "only the channel owner can post" });
     }
     const body = (req.body?.body || "").toString().trim();
     if (!body) return res.status(400).json({ error: "message body is required" });

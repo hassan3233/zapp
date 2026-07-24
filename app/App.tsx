@@ -34,6 +34,7 @@ import NewChatScreen from "./src/screens/NewChatScreen";
 import ChatScreen from "./src/screens/ChatScreen";
 import ContactProfileScreen from "./src/screens/ContactProfileScreen";
 import CallsScreen from "./src/screens/CallsScreen";
+import ChannelsScreen from "./src/screens/ChannelsScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
 import AccountScreen from "./src/screens/AccountScreen";
@@ -148,6 +149,24 @@ function CallsStack() {
   );
 }
 
+// Channels get their own stack so opening one pushes the normal ChatScreen
+// (which handles posts, media and the read-only composer for subscribers).
+const ChannelsStackNav = createNativeStackNavigator();
+function ChannelsStack() {
+  const { t } = useT();
+  const screenOptions = useScreenOptions();
+  return (
+    <ChannelsStackNav.Navigator screenOptions={screenOptions}>
+      <ChannelsStackNav.Screen
+        name="Channels"
+        component={ChannelsScreen}
+        options={{ title: t("tab.channels") }}
+      />
+      <ChannelsStackNav.Screen name="Chat" component={ChatScreen} />
+    </ChannelsStackNav.Navigator>
+  );
+}
+
 const Tab = createBottomTabNavigator();
 function tabIcon(emoji: string) {
   return ({ focused }: { focused: boolean }) => (
@@ -178,6 +197,19 @@ function AppTabs() {
           )
             ? { display: "none" as const }
             : { backgroundColor: colors.surface, borderTopColor: colors.border },
+        })}
+      />
+      <Tab.Screen
+        name="ChannelsTab"
+        component={ChannelsStack}
+        options={({ route }) => ({
+          title: t("tab.channels"),
+          tabBarIcon: tabIcon("📢"),
+          // Hide the tab bar while reading a channel, same as an open chat.
+          tabBarStyle:
+            (getFocusedRouteNameFromRoute(route) ?? "Channels") === "Chat"
+              ? { display: "none" as const }
+              : { backgroundColor: colors.surface, borderTopColor: colors.border },
         })}
       />
       <Tab.Screen name="CallsTab" component={CallsStack} options={{ title: t("tab.calls"), tabBarIcon: tabIcon("📞") }} />

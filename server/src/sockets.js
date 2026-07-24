@@ -185,9 +185,14 @@ export function registerSockets(io) {
         if (typeof ack === "function") ack({ ok: false, error: "forbidden" });
         return;
       }
-      // In 1:1 chats a block (either direction) stops messages.
       const conv = getConversation(convId);
-      if (conv && !conv.is_group) {
+      // Channels are broadcast-only: subscribers can read but not post.
+      if (conv && conv.is_channel && Number(conv.owner_id) !== Number(socket.user.id)) {
+        if (typeof ack === "function") ack({ ok: false, error: "only the channel owner can post" });
+        return;
+      }
+      // In 1:1 chats a block (either direction) stops messages.
+      if (conv && !conv.is_group && !conv.is_channel) {
         const other = getConversationMemberIds(convId).find(
           (id) => id !== socket.user.id
         );

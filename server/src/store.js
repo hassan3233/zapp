@@ -342,10 +342,112 @@ export function getConversationMembers(conversationId) {
 }
 
 // List a user's conversations with the other member + last message preview.
+// ---- Channels (broadcast) ----
+// A channel is a conversation with is_channel=1; its members are subscribers
+// and only owner_id may post. Posts are plain text, not E2EE (see db.js).
+export function createChannel(ownerId, title, description) {
+  db.exec("BEGIN");
+  try {
+    const info = db
+      .prepare(
+        `INSERT INTO conversations (is_group, is_channel, title, description, owner_id)
+         VALUES (0, 1, ?, ?, ?)`
+      )
+      .run(title, description || null, ownerId);
+    const convId = Number(info.lastInsertRowid);
+    // The owner is a subscriber too, so the channel shows in their list.
+    db.prepare(
+      "INSERT OR IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?, ?)"
+    ).run(convId, ownerId);
+    db.exec("COMMIT");
+    return convId;
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+export function getChannel(id) {
+  const c = db
+    .prepare("SELECT * FROM conversations WHERE id = ? AND is_channel = 1")
+    .get(Number(id));
+  return c ? serializeChannel(c, null) : null;
+}
+
+export function isChannelOwner(convId, userId) {
+  const c = db
+    .prepare("SELECT owner_id FROM conversations WHERE id = ? AND is_channel = 1")
+    .get(Number(convId));
+  return !!c && Number(c.owner_id) === Number(userId);
+}
+
+export function isChannel(convId) {
+  const c = db
+    .prepare("SELECT is_channel FROM conversations WHERE id = ?")
+    .get(Number(convId));
+  return !!c && !!c.is_channel;
+}
+
+function serializeChannel(c, viewerId) {
+  const subscribers = db
+    .prepare("SELECT COUNT(*) AS n FROM conversation_members WHERE conversation_id = ?")
+    .get(c.id).n;
+  const row = {
+    id: c.id,
+    title: c.title,
+    description: c.description || null,
+    ownerId: c.owner_id,
+    isChannel: true,
+    subscribers,
+    createdAt: c.created_at,
+  };
+  if (viewerId != null) {
+    row.subscribed = !!db
+      .prepare(
+        "SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?"
+      )
+      .get(c.id, Number(viewerId));
+    row.isOwner = Number(c.owner_id) === Number(viewerId);
+  }
+  return row;
+}
+
+// Every channel, newest first, annotated for this viewer (subscribed/owner).
+// `q` filters by name so the discover screen can search.
+export function listChannels(viewerId, q) {
+  const term = (q || "").trim().toLowerCase();
+  const rows = term
+    ? db
+        .prepare(
+          `SELECT * FROM conversations WHERE is_channel = 1
+             AND lower(title) LIKE ? ORDER BY id DESC LIMIT 100`
+        )
+        .all(`%${term}%`)
+    : db
+        .prepare("SELECT * FROM conversations WHERE is_channel = 1 ORDER BY id DESC LIMIT 100")
+        .all();
+  return rows.map((c) => serializeChannel(c, viewerId));
+}
+
+export function subscribeToChannel(convId, userId) {
+  db.prepare(
+    "INSERT OR IGNORE INTO conversation_members (conversation_id, user_id) VALUES (?, ?)"
+  ).run(Number(convId), Number(userId));
+}
+
+export function unsubscribeFromChannel(convId, userId) {
+  // The owner stays subscribed — leaving your own channel would orphan it.
+  if (isChannelOwner(convId, userId)) return false;
+  db.prepare(
+    "DELETE FROM conversation_members WHERE conversation_id = ? AND user_id = ?"
+  ).run(Number(convId), Number(userId));
+  return true;
+}
+
 export function listConversations(userId) {
   const rows = db
     .prepare(
-      `SELECT c.id, c.is_group, c.title, c.created_at
+      `SELECT c.id, c.is_group, c.is_channel, c.owner_id, c.title, c.created_at
        FROM conversations c
        JOIN conversation_members m ON m.conversation_id = c.id
        WHERE m.user_id = ?`
@@ -365,6 +467,10 @@ export function listConversations(userId) {
       return {
         id: c.id,
         isGroup: !!c.is_group,
+        isChannel: !!c.is_channel,
+        ownerId: c.owner_id || null,
+        // Only the owner can post, so the client knows to hide the composer.
+        isOwner: !!c.is_channel && Number(c.owner_id) === Number(userId),
         title: c.title,
         members,
         lastMessage: last
