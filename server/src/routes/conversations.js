@@ -82,7 +82,9 @@ export default function conversationsRouter(io) {
   // GET /api/conversations/:id/messages?before=123
   router.get("/:id/messages", requireAuth, (req, res) => {
     const convId = Number(req.params.id);
-    if (!isMember(convId, req.user.id)) {
+    // Channels are public broadcasts: anyone may read them, so you can preview
+    // one from Discover before subscribing. Posting stays owner-only.
+    if (!isChannel(convId) && !isMember(convId, req.user.id)) {
       return res.status(403).json({ error: "not a member of this conversation" });
     }
     const before = req.query.before ? Number(req.query.before) : undefined;
